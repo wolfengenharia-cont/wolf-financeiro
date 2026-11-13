@@ -267,10 +267,12 @@
       <div>
         <h2>Conferência de boleto / NF importado</h2>
         <div class="desc" id="receberConferenciaDesc">Revise os campos abaixo (alguns podem ter vindo em branco, dependendo do PDF) e complete o que faltar antes de confirmar.</div>
+        <div class="note" id="receberConferenciaAvisoDuplicado" style="display:none;color:#b8720a;font-weight:600;"></div>
       </div>
       <div class="row">
         <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="recConfCliente" placeholder="Nome do cliente"></div>
         <div class="field"><label>Tipo</label><select id="recConfTipo"><option value="Boleto">Boleto</option><option value="NF">NF</option><option value="NF+Boleto">NF + Boleto</option></select></div>
+        <div class="field"><label>Forma de pagamento</label><select id="recConfFormaPagamento"><option value="">— selecione —</option><option value="Boleto">Boleto</option><option value="PIX">PIX</option><option value="TED">TED</option><option value="Outro">Outro</option></select></div>
         <div class="field"><label>Número</label><input type="text" id="recConfNumero" class="small-input" placeholder="Nº"></div>
         <div class="field"><label>Emissão</label><input type="date" id="recConfEmissao"></div>
         <div class="field"><label>Vencimento</label><input type="date" id="recConfVencimento"></div>
@@ -477,6 +479,7 @@
       <div class="row">
         <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="recCliente" placeholder="Nome do cliente"></div>
         <div class="field"><label>Tipo</label><select id="recTipo"><option value="Boleto">Boleto</option><option value="NF">NF</option><option value="NF+Boleto">NF + Boleto</option></select></div>
+        <div class="field"><label>Forma de pagamento</label><select id="recFormaPagamento"><option value="">— selecione —</option><option value="Boleto">Boleto</option><option value="PIX">PIX</option><option value="TED">TED</option><option value="Outro">Outro</option></select></div>
         <div class="field"><label>Número</label><input type="text" id="recNumero" class="small-input" placeholder="Nº"></div>
         <div class="field"><label>Emissão</label><input type="date" id="recEmissao"></div>
         <div class="field"><label>Vencimento</label><input type="date" id="recVencimento"></div>
@@ -520,9 +523,13 @@
           </select>
         </div>
       </div>
+      <div style="margin-bottom:10px;">
+        <button class="btn secondary small" onclick="detectarDuplicadosReceivables()">🔍 Procurar títulos duplicados</button>
+      </div>
+      <div id="duplicadosReceivablesArea"></div>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>Cliente</th><th>Tipo/Nº</th><th>Emissão</th><th>Vencimento</th><th>Valor</th><th>OS</th><th>Status</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Tipo/Nº</th><th>Pagamento</th><th>Emissão</th><th>Vencimento</th><th>Valor</th><th>OS</th><th>Status</th><th>Ações</th></tr></thead>
           <tbody id="tblReceivables"></tbody>
         </table>
       </div>
@@ -805,7 +812,7 @@ let state = {
   costCenters: [...DEFAULT_CC],
   serviceOrders: [],
   transactions: [], // {id, date:'YYYY-MM-DD', description, value(+/-), costCenter, serviceOrder, source, note, attachment:{name,type,dataUrl,size}|null}
-  receivables: [], // {id, cliente, tipo, numero, dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido', dataRecebimento, linkedTxId}
+  receivables: [], // {id, cliente, tipo, formaPagamento:'Boleto'|'PIX'|'TED'|'Outro', numero, dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido'|'cancelado', dataRecebimento, linkedTxId}
   payables: [], // {id, descricao, vencimento, valor, costCenter, serviceOrder, note, status:'pendente'|'pago', dataPagamento, linkedTxId}
   partners: [], // ['Alex','Bruno/Jessica']
   partnerPayments: [], // {id, date, partner, tipo:'pro-labore'|'distribuicao', value, note}
@@ -2299,6 +2306,7 @@ function renderReceivables(){
     return `<tr>
       <td>${escapeHtml(r.cliente)}</td>
       <td>${r.tipo}${r.numero? ' nº '+escapeHtml(r.numero):''}${r.nossoNumero?`<br><span class="badge-source">Nosso Nº ${escapeHtml(r.nossoNumero)}</span>`:''}</td>
+      <td>${escapeHtml(r.formaPagamento||'—')}</td>
       <td>${fmtDateBR(r.dataEmissao)}</td>
       <td>${fmtDateBR(r.vencimento)}</td>
       <td class="val-pos">${fmtBRL(r.valor)}</td>
@@ -2306,13 +2314,30 @@ function renderReceivables(){
       <td>${statusPill}</td>
       <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deleteReceivable('${r.id}')">✕</span></div></td>
     </tr>`;
-  }).join("") : `<tr><td colspan="8" class="empty">${todos.length ? 'Nenhum título nessa situação.' : 'Nenhum boleto/NF registrado ainda.'}</td></tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">${todos.length ? 'Nenhum título nessa situação.' : 'Nenhum boleto/NF registrado ainda.'}</td></tr>`;
   document.getElementById("resumoReceivables").innerHTML =
     `Pendente: <b>${fmtBRL(totalPendente)}</b> &nbsp;|&nbsp; Recebido: <b class="val-pos">${fmtBRL(totalRecebido)}</b>${totalCancelado?` &nbsp;|&nbsp; Cancelado: <b>${fmtBRL(totalCancelado)}</b>`:''}`;
+}
+// Usado para evitar lançar o mesmo boleto/NF duas vezes (ex: uma vez manual/PDF e depois de
+// novo pelo relatório do banco, ou simplesmente clicar "Registrar" duas vezes sem querer).
+function normalizarTexto(s){
+  return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
+}
+function encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, excludeId){
+  const clienteNorm = normalizarTexto(cliente);
+  if(!clienteNorm || !vencimento || isNaN(valor)) return null;
+  return state.receivables.find(r=>
+    r.id!==excludeId &&
+    r.status!=="cancelado" &&
+    normalizarTexto(r.cliente)===clienteNorm &&
+    r.vencimento===vencimento &&
+    Math.abs(Math.abs(r.valor)-Math.abs(valor))<0.02
+  ) || null;
 }
 function addReceivable(){
   const cliente = document.getElementById("recCliente").value.trim();
   const tipo = document.getElementById("recTipo").value;
+  const formaPagamento = document.getElementById("recFormaPagamento").value;
   const numero = document.getElementById("recNumero").value.trim();
   const dataEmissao = document.getElementById("recEmissao").value;
   const vencimento = document.getElementById("recVencimento").value;
@@ -2321,12 +2346,15 @@ function addReceivable(){
   const cc = document.getElementById("recCC").value;
   const nota = document.getElementById("recNota").value.trim();
   if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor."); return; }
+  const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
+  if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
-    id: uid(), cliente, tipo, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    id: uid(), cliente, tipo, formaPagamento, numero, nossoNumero:"", dataEmissao, vencimento, valor,
     serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
   });
   saveState();
   ["recCliente","recNumero","recValor","recNota"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("recFormaPagamento").value = "";
   renderReceivables();
   toast("Título registrado.");
 }
@@ -2357,6 +2385,42 @@ function deleteReceivable(id){
   state.receivables = state.receivables.filter(x=>x.id!==id);
   saveState();
   renderReceivables(); renderPainel();
+}
+// Agrupa os títulos por cliente (normalizado) + vencimento + valor pra achar lançamentos
+// repetidos (ex: um importado manualmente e depois de novo pelo relatório do banco).
+function detectarDuplicadosReceivables(){
+  const grupos = {};
+  state.receivables.forEach(r=>{
+    const chave = `${normalizarTexto(r.cliente)}|${r.vencimento}|${Math.round(Math.abs(r.valor)*100)}`;
+    (grupos[chave] = grupos[chave] || []).push(r);
+  });
+  const duplicados = Object.values(grupos).filter(g=>g.length>1);
+  const area = document.getElementById("duplicadosReceivablesArea");
+  if(!duplicados.length){
+    area.innerHTML = `<div class="note" style="color:var(--green);margin-bottom:10px;">Nenhum título duplicado encontrado (mesmo cliente, vencimento e valor).</div>`;
+    return;
+  }
+  area.innerHTML = `<div class="card" style="background:#fff6e6;border-color:#f0d9a8;">
+    <h2 style="margin-top:0;">${duplicados.length} grupo(s) de possível duplicidade</h2>
+    <div class="desc">Mesmo cliente, vencimento e valor — provavelmente o mesmo boleto lançado mais de uma vez. Confira e remova o(s) que sobrar(em).</div>
+    ${duplicados.map(g=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:#fff;">
+        <b>${escapeHtml(g[0].cliente)}</b> — vencimento ${fmtDateBR(g[0].vencimento)} — ${fmtBRL(g[0].valor)}
+        <table style="margin-top:6px;">
+          <thead><tr><th>Tipo/Nº</th><th>Pagamento</th><th>Status</th><th>Origem</th><th></th></tr></thead>
+          <tbody>
+            ${g.map(r=>`<tr>
+              <td>${escapeHtml(r.tipo||"")}${r.numero?' nº '+escapeHtml(r.numero):''}</td>
+              <td>${escapeHtml(r.formaPagamento||'—')}</td>
+              <td>${escapeHtml(r.status)}</td>
+              <td><span class="note">${escapeHtml(r.note||'')}</span></td>
+              <td><button class="btn danger small" onclick="deleteReceivable('${r.id}');detectarDuplicadosReceivables();">Remover</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    `).join("")}
+  </div>`;
 }
 // Ao importar o extrato, tenta casar automaticamente um lançamento de receita com um título
 // pendente de "Boletos/NF a receber" — mesmo valor (tolerância de poucos centavos) e vencimento
@@ -2445,7 +2509,21 @@ function importarRelatorioBoletos(rows){
     // valor efetivamente recebido: usa a coluna "Liquidação (R$)" quando disponível (pode ter juros/multa ou desconto), senão o valor de face
     const valorRecebido = (!isNaN(liquidacaoRaw) && liquidacaoRaw>0) ? liquidacaoRaw : valor;
 
-    const existente = nossoNumero ? state.receivables.find(x=>x.nossoNumero && x.nossoNumero===nossoNumero) : null;
+    let existente = nossoNumero ? state.receivables.find(x=>x.nossoNumero && x.nossoNumero===nossoNumero) : null;
+    if(!existente){
+      // Título lançado manualmente ou importado de PDF não tem "Nosso Número" (só o relatório
+      // do banco traz isso). Sem esse segundo critério, toda importação do relatório criaria
+      // um boleto duplicado em vez de atualizar o que já existe.
+      existente = state.receivables.find(x=>
+        x.status!=="cancelado" &&
+        normalizarTexto(x.cliente)===normalizarTexto(cliente) &&
+        x.vencimento===vencimento &&
+        Math.abs(Math.abs(x.valor)-Math.abs(valor))<0.02
+      ) || null;
+      if(existente && nossoNumero && !existente.nossoNumero){
+        existente.nossoNumero = nossoNumero;
+      }
+    }
 
     if(existente){
       if(existente.status === "recebido"){
@@ -2470,7 +2548,7 @@ function importarRelatorioBoletos(rows){
       }
     } else {
       const novo = {
-        id: uid(), cliente, tipo: "Boleto", numero, nossoNumero,
+        id: uid(), cliente, tipo: "Boleto", formaPagamento: "Boleto", numero, nossoNumero,
         dataEmissao, vencimento, valor,
         serviceOrder: "", costCenter: "",
         note: "Importado do relatório de boletos (Sicredi).",
@@ -3687,6 +3765,7 @@ async function handleReceberPdfFile(evt){
 function openReceberConferencia(dados){
   document.getElementById("recConfCliente").value = dados.cliente || "";
   document.getElementById("recConfTipo").value = dados.tipo || "Boleto";
+  document.getElementById("recConfFormaPagamento").value = (dados.tipo==="Boleto"||dados.tipo==="NF+Boleto") ? "Boleto" : "";
   document.getElementById("recConfNumero").value = dados.numero || "";
   document.getElementById("recConfEmissao").value = dados.dataEmissao || "";
   document.getElementById("recConfVencimento").value = (dados.vencimento && dados.vencimento!=="") ? dados.vencimento : "";
@@ -3695,6 +3774,16 @@ function openReceberConferencia(dados){
   fillOSSelects(); fillCCSelects();
   document.getElementById("recConfOS").value = "";
   document.getElementById("recConfCC").value = "";
+  const avisoEl = document.getElementById("receberConferenciaAvisoDuplicado");
+  const valorNum = dados.valor!==undefined && dados.valor!=="" ? parseFloat(dados.valor) : NaN;
+  const dup = encontrarPossivelDuplicadoReceivable(dados.cliente, dados.vencimento, valorNum, null);
+  if(dup){
+    avisoEl.style.display = "block";
+    avisoEl.textContent = `⚠ Já existe um título parecido registrado: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Confira antes de confirmar pra não duplicar.`;
+  } else {
+    avisoEl.style.display = "none";
+    avisoEl.textContent = "";
+  }
   document.getElementById("receberConferenciaCard").style.display = "block";
   irParaAba("conferencias");
 }
@@ -3705,6 +3794,7 @@ function cancelarReceberConferencia(){
 function confirmarReceberConferencia(){
   const cliente = document.getElementById("recConfCliente").value.trim();
   const tipo = document.getElementById("recConfTipo").value;
+  const formaPagamento = document.getElementById("recConfFormaPagamento").value;
   const numero = document.getElementById("recConfNumero").value.trim();
   const dataEmissao = document.getElementById("recConfEmissao").value;
   const vencimento = document.getElementById("recConfVencimento").value;
@@ -3713,8 +3803,10 @@ function confirmarReceberConferencia(){
   const cc = document.getElementById("recConfCC").value;
   const nota = document.getElementById("recConfNota").value.trim();
   if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor antes de confirmar."); return; }
+  const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
+  if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
-    id: uid(), cliente, tipo, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    id: uid(), cliente, tipo, formaPagamento, numero, nossoNumero:"", dataEmissao, vencimento, valor,
     serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
   });
   saveState();
