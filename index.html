@@ -1069,12 +1069,45 @@ async function construirAnexo(file, descricaoBase, dataRef){
     reader.readAsDataURL(file);
   });
 }
+// Converte um data: URL (como os que ficam guardados quando não há pasta de anexos vinculada)
+// num blob: URL. O Chrome bloqueia abrir uma aba nova navegando direto para um data: URL (fica
+// com a aba em branco, sem erro visível) — um blob: URL não tem essa restrição.
+function dataUrlParaBlobUrl(dataUrl, mimeFallback){
+  const virgula = dataUrl.indexOf(",");
+  if(virgula<0) return dataUrl;
+  const meta = dataUrl.slice(5, virgula); // "<mime>;base64" ou "<mime>"
+  const mime = meta.split(";")[0] || mimeFallback || "application/octet-stream";
+  const dadosBase = dataUrl.slice(virgula+1);
+  let bytes;
+  if(/;base64/i.test(meta)){
+    const byteStr = atob(dadosBase);
+    bytes = new Uint8Array(byteStr.length);
+    for(let i=0;i<byteStr.length;i++) bytes[i] = byteStr.charCodeAt(i);
+  } else {
+    bytes = new TextEncoder().encode(decodeURIComponent(dadosBase));
+  }
+  return URL.createObjectURL(new Blob([bytes], {type: mime}));
+}
 function abrirAnexo(attachment){
   if(!attachment) return;
   if(attachment.storage === "folder"){
     abrirArquivoDaPasta(attachment.folderFileName);
   } else if(attachment.dataUrl){
-    window.open(attachment.dataUrl, "_blank");
+    try{
+      const blobUrl = dataUrlParaBlobUrl(attachment.dataUrl, attachment.type);
+      // Abre através de um link real (em vez de window.open direto) — mais confiável pra
+      // navegar pra um blob: URL numa aba nova, sem cair na tela em branco.
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }catch(e){
+      console.warn("Falha ao converter anexo para blob, tentando abrir direto:", e);
+      window.open(attachment.dataUrl, "_blank");
+    }
   }
 }
 
@@ -1088,8 +1121,16 @@ function loadState(){
   }catch(e){ console.warn("Não foi possível ler o cache local:", e); }
 }
 function saveState(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch(e){ console.warn("Não foi possível salvar no cache local:", e); }
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.warn("Não foi possível salvar no cache local:", e);
+    // Isso normalmente significa que o espaço de armazenamento do navegador acabou (comum
+    // quando tem muito PDF guardado direto no navegador, sem pasta de anexos vinculada). Sem
+    // avisar, os dados mais recentes ficam só na tela e se perdem ao atualizar a página — por
+    // isso avisamos na hora, em vez de deixar passar em silêncio.
+    alert("Atenção: não consegui salvar essa alteração (o espaço de armazenamento do navegador parece ter acabado). Pra não perder dados, vincule uma pasta de anexos (botão no topo da tela) — isso guarda os PDFs na pasta em vez de dentro do navegador. Enquanto isso, evite atualizar ou fechar a página antes de resolver, ou essa última alteração pode se perder.");
+  }
 }
 
 function exportData(){
