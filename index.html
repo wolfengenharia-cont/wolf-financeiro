@@ -3515,16 +3515,28 @@ function decodeLinhaDigitavel(textoCompleto){
   const valorCentavos = parseInt(digits.slice(37,47),10);
   let vencimento = "";
   if(fator>0 && fator<9999){
-    const base = Date.UTC(1997,9,7);
-    const d = new Date(base + fator*86400000);
-    vencimento = d.toISOString().slice(0,10);
+    // Em 22/02/2025 a Febraban zerou a contagem do "fator de vencimento" (o número antigo,
+    // com base em 07/10/1997, estava chegando no limite de 4 dígitos). Boletos emitidos a
+    // partir dessa data usam uma base nova (29/05/2022) com a mesma fórmula. Como o mesmo
+    // número de 4 dígitos pode corresponder a uma data nas duas convenções, escolhemos a
+    // interpretação mais próxima de hoje — o caso normal, já que o boleto é um documento
+    // recente, bem mais confiável do que presumir sempre a convenção antiga (hoje aposentada).
+    const BASE_ANTIGA = Date.UTC(1997,9,7);
+    const BASE_NOVA = Date.UTC(2022,4,29);
+    const candidatoAntiga = BASE_ANTIGA + fator*86400000;
+    const candidatoNova = BASE_NOVA + fator*86400000;
+    const agora = Date.now();
+    const ms = Math.abs(candidatoNova-agora) <= Math.abs(candidatoAntiga-agora) ? candidatoNova : candidatoAntiga;
+    vencimento = new Date(ms).toISOString().slice(0,10);
   }
   return {valor: valorCentavos/100, vencimento};
 }
 function buscarCampoEmLinhas(linhas, rotulos){
   for(let i=0;i<linhas.length;i++){
     for(const r of rotulos){
-      const reResto = new RegExp(r+"\\s*[:\\-]?\\s*(.+)$","i");
+      // Ancorado no início da linha, para não confundir com o rótulo aparecendo
+      // no meio de outra frase (ex: "Recibo do Pagador" não deve bater com "Pagador").
+      const reResto = new RegExp("^\\s*"+r+"\\s*[:\\-]?\\s*(.+)$","i");
       const m = linhas[i].match(reResto);
       if(m && m[1] && m[1].trim()) return m[1].trim();
       const reSo = new RegExp("^\\s*"+r+"\\s*[:\\-]?\\s*$","i");
@@ -3565,8 +3577,12 @@ async function handleReceberPdfFile(evt){
         "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
         "Nome do Pagador","Pagador","Sacado"
       ]);
+      // Boletos costumam trazer o CNPJ/CPF colado no nome, ex: "Empresa X - 12345678000190".
+      // Tira esse final só quando ele bate com um CNPJ/CPF (11 ou 14 dígitos), pra não cortar
+      // nomes de cliente que legitimamente terminem com números.
+      clienteTexto = clienteTexto.replace(/\s*-\s*\d{11}(\d{3})?$/,"").trim();
       const numeroTexto = buscarCampoEmLinhas(linhas, [
-        "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota","Nosso N[úu]mero"
+        "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota"
       ]);
       numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
       const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
@@ -3581,7 +3597,9 @@ async function handleReceberPdfFile(evt){
     }
 
     const temBoleto = !!boleto;
-    const temNF = !isNaN(valorNF) || !!numero || !!clienteTexto;
+    // Não usamos clienteTexto aqui: tanto boleto (rótulo "Pagador") quanto NF (rótulo "Tomador")
+    // preenchem esse campo, então ele não serve para diferenciar os dois tipos de documento.
+    const temNF = !isNaN(valorNF) || !!numero;
     let tipo = "Boleto";
     if(temBoleto && temNF) tipo = "NF+Boleto";
     else if(!temBoleto && temNF) tipo = "NF";
