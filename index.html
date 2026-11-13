@@ -1,0 +1,3440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wolf Financeiro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --border:#e2e5eb; --text:#1f2430; --muted:#6b7280;
+    --primary:#2f5233; --primary-dark:#213a24; --accent:#c98a3b;
+    --green:#1f8a4c; --green-bg:#e7f6ec; --red:#c23b3b; --red-bg:#fbe9e9;
+    --blue:#2b6cb0; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:var(--primary);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.3px;}
+  header .sub{font-size:12px;opacity:.8;margin-top:2px;}
+  .backup-btns button{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:7px 12px;font-size:12.5px;cursor:pointer;margin-left:8px;}
+  .backup-btns button:hover{background:rgba(255,255,255,.28);}
+  #pastaAnexosStatus{font-size:12.5px;color:#fff;opacity:.9;margin-right:4px;}
+  #pastaAnexosStatus button{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:7px 12px;font-size:12.5px;cursor:pointer;margin-left:8px;}
+  #pastaAnexosStatus button:hover{background:rgba(255,255,255,.28);}
+  nav{background:var(--primary-dark);display:flex;flex-wrap:wrap;padding:0 16px;}
+  nav button{background:none;border:none;color:#dfe6df;padding:12px 16px;font-size:13.5px;cursor:pointer;border-bottom:3px solid transparent;}
+  nav button.active{color:#fff;border-bottom:3px solid var(--accent);font-weight:600;}
+  nav button:hover{color:#fff;}
+  nav button.future{opacity:.55;}
+  .nav-badge{display:inline-block;background:var(--red);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px;margin-left:4px;vertical-align:middle;}
+  .meta-bar-wrap{background:#eceff1;border-radius:10px;height:18px;overflow:hidden;margin:10px 0 6px;}
+  .meta-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s;min-width:2px;}
+  .meta-bar-fill.atingida{background:var(--green);}
+  main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+  .tab{display:none;}
+  .tab.active{display:block;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;}
+  .card h2{margin:0 0 4px;font-size:16px;}
+  .card .desc{color:var(--muted);font-size:12.5px;margin-bottom:14px;}
+  .grid-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .kpi .label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .kpi .value{font-size:22px;font-weight:700;}
+  .kpi .value.pos{color:var(--green);}
+  .kpi .value.neg{color:var(--red);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  th{background:#f8f9fb;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+  tr:hover td{background:#fafbfc;}
+  .val-pos{color:var(--green);font-weight:600;}
+  .val-neg{color:var(--red);font-weight:600;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:12px;color:var(--muted);}
+  input,select,textarea{font-family:inherit;font-size:13.5px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text);}
+  textarea{width:100%;min-height:110px;font-family:monospace;font-size:12px;}
+  button.btn{background:var(--primary);color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13.5px;cursor:pointer;}
+  button.btn:hover{background:var(--primary-dark);}
+  button.btn.secondary{background:#fff;color:var(--primary);border:1px solid var(--primary);}
+  button.btn.danger{background:var(--red);}
+  button.btn.small{padding:5px 10px;font-size:12px;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .pill.green{background:var(--green-bg);color:var(--green);}
+  .pill.red{background:var(--red-bg);color:var(--red);}
+  .empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;}
+  .tag-remove{cursor:pointer;color:var(--red);margin-left:6px;font-weight:700;}
+  .cc-chip{display:inline-flex;align-items:center;background:#f0f1f4;border:1px solid var(--border);border-radius:20px;padding:5px 12px;margin:0 6px 6px 0;font-size:12.5px;}
+  .future-box{background:#fafafa;border:1px dashed #cfd3da;border-radius:var(--radius);padding:24px;text-align:center;color:var(--muted);}
+  .future-box h3{color:var(--text);margin-bottom:6px;}
+  .bar-chart{display:flex;align-items:flex-end;gap:10px;height:160px;padding-top:10px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:11px;}
+  .bar-wrap{display:flex;gap:2px;align-items:flex-end;height:120px;width:100%;justify-content:center;}
+  .bar{width:14px;border-radius:3px 3px 0 0;}
+  .bar.receita{background:var(--green);}
+  .bar.despesa{background:var(--red);}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:8px;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .toast{position:fixed;bottom:20px;right:20px;background:#1f2430;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:50;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .note{font-size:12px;color:var(--muted);margin-top:6px;}
+  .flex-between{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .small-input{width:80px;}
+  .conf-table input, .conf-table select{width:100%;}
+  .badge-source{font-size:10.5px;padding:1px 6px;border-radius:4px;background:#eef1f5;color:var(--muted);display:inline-block;margin-top:3px;}
+  .anexo-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .anexo-cell .fname{font-size:11.5px;color:var(--muted);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acoes-cell{display:flex;align-items:center;gap:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Wolf Financeiro</h1>
+    <div class="sub">Gestão financeira — Wolf Engenharia e Consultoria</div>
+  </div>
+  <div class="backup-btns">
+    <span id="pastaAnexosStatus"></span>
+    <button onclick="exportData()">⬇ Exportar dados (backup)</button>
+    <button onclick="document.getElementById('importFile').click()">⬆ Importar dados</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button id="btnConectarDrive" onclick="conectarGoogleDrive()">☁ Conectar Google Drive</button>
+    <button id="btnSalvarNuvem" onclick="salvarNaNuvem()" style="display:none;">⬆ Salvar na nuvem</button>
+    <button id="btnCarregarNuvem" onclick="carregarDaNuvem()" style="display:none;">⬇ Carregar da nuvem</button>
+    <span id="driveStatus" style="margin-left:8px;font-size:12px;opacity:.85;"></span>
+  </div>
+</header>
+
+<nav id="nav">
+  <button data-tab="painel" class="active">Painel</button>
+  <button data-tab="conferencias">Conferências <span id="navBadgeConferencias" class="nav-badge" style="display:none;"></span></button>
+  <button data-tab="importar">Importar Extrato</button>
+  <button data-tab="lancamentos">Lançamentos</button>
+  <button data-tab="balancete">Balancete</button>
+  <button data-tab="centros">Centros de Custo</button>
+  <button data-tab="recorrentes">Recorrentes</button>
+  <button data-tab="receber">Boletos/NF (a receber)</button>
+  <button data-tab="pagar">Contas a Pagar</button>
+  <button data-tab="socios">Sócios</button>
+  <button data-tab="patrimonio">Patrimônio</button>
+  <button data-tab="estoque">Estoque</button>
+</nav>
+
+<main>
+
+  <!-- PAINEL -->
+  <div class="tab active" id="tab-painel">
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Painel</h2>
+          <div class="desc">Visão geral para acompanhamento. Use o filtro de mês para ver qualquer período.</div>
+        </div>
+        <div class="row" style="align-items:flex-end;">
+          <div class="field"><label>Mês</label><select id="painelMes" class="small-input" onchange="renderPainel()"></select></div>
+          <div class="field"><label>Saldo inicial de referência (opcional)</label><input type="number" step="0.01" id="saldoInicial" class="small-input" placeholder="0,00" onchange="setSaldoInicial(this.value)"></div>
+        </div>
+      </div>
+      <div class="grid-kpi" id="kpiGrid"></div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Meta de faturamento mensal</h2>
+          <div class="desc">Faturado = valor dos boletos/NF emitidos (aba Boletos/NF a receber) com data de emissão no mês selecionado, independente de já ter sido recebido.</div>
+        </div>
+        <div class="field"><label>Meta mensal (R$)</label><input type="number" step="0.01" id="metaFaturamento" class="small-input" onchange="setMetaFaturamento(this.value)"></div>
+      </div>
+      <div class="meta-bar-wrap"><div class="meta-bar-fill" id="faturamentoBarFill"></div></div>
+      <div class="note" id="faturamentoResumo"></div>
+    </div>
+
+    <div class="card">
+      <h2>Evolução mensal — receitas x despesas</h2>
+      <div class="desc">Últimos 6 meses com lançamentos.</div>
+      <div id="chartArea"></div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--green)"></i> Receitas</span>
+        <span><i class="dot" style="background:var(--red)"></i> Despesas</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Boletos/NF a receber no mês selecionado</h2>
+      <div class="desc">Vencimento dentro do mês filtrado, ainda pendentes de recebimento.</div>
+      <table><thead><tr><th>Vencimento</th><th>Cliente</th><th>Tipo</th><th>Valor</th></tr></thead><tbody id="tblReceberMes"></tbody></table>
+      <div class="note" id="resumoReceberMes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Contas a pagar no mês selecionado</h2>
+      <div class="desc">Vencimento dentro do mês filtrado, pendentes e já pagas.</div>
+      <table><thead><tr><th>Vencimento</th><th>Descrição</th><th>Valor</th><th>Status</th></tr></thead><tbody id="tblPagarMes"></tbody></table>
+      <div class="note" id="resumoPagarMes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Despesas por centro de custo — mês selecionado</h2>
+      <table id="tblDespesasCC"><thead><tr><th>Centro de custo</th><th>Total</th><th>% do mês</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="card">
+      <h2>Custo Fixo x Variável — mês selecionado</h2>
+      <div class="desc">Baseado na Classificação escolhida na conferência de cada lançamento (Despesas Administrativas, Pró-labore e Taxas Bancárias/Impostos de regra geral entram em Fixo; Serviço Terceirizado, Almoxarifado e Despesas Operacionais em Variável; Patrimônio/Investimento e Divisão de Lucros ficam em grupos próprios, fora do custo operacional).</div>
+      <table id="tblTipoCusto"><thead><tr><th>Classificação</th><th>Total</th><th>% do grupo</th></tr></thead><tbody></tbody></table>
+      <div class="note" id="resumoTipoCusto"></div>
+    </div>
+
+    <div class="card">
+      <h2>Próximos vencimentos</h2>
+      <div class="desc">Boletos/NF a receber e contas a pagar pendentes, nos próximos 15 dias ou já vencidos (não depende do filtro de mês).</div>
+      <table><thead><tr><th>Vencimento</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Status</th></tr></thead><tbody id="tblVencimentos"></tbody></table>
+    </div>
+
+    <div class="card">
+      <h2>Últimos lançamentos</h2>
+      <table><thead><tr><th>Data</th><th>Descrição</th><th>Centro de custo</th><th>Valor</th></tr></thead><tbody id="tblUltimos"></tbody></table>
+    </div>
+  </div>
+
+  <!-- CONFERÊNCIAS (aba única com tudo que precisa de revisão) -->
+  <div class="tab" id="tab-conferencias">
+    <div class="card" id="conferenciasVazio">
+      <h2>Conferências pendentes</h2>
+      <div class="desc" id="conferenciasVazioTexto">Tudo certo por aqui — nenhuma conferência pendente no momento.</div>
+    </div>
+
+    <div class="card" id="conferenciaCard" style="display:none;">
+      <div class="flex-between">
+        <div>
+          <h2>Conferência de lançamentos (extrato importado)</h2>
+          <div class="desc">Revise data, descrição, valor, a Classificação (sugerida automaticamente) e o centro de custo antes de lançar. Linhas com problema aparecem destacadas.</div>
+        </div>
+        <button class="btn secondary small" onclick="addManualRow()">+ Adicionar linha</button>
+      </div>
+
+      <div class="row" style="align-items:flex-end;background:#f7f8fb;padding:10px;border-radius:8px;margin-bottom:10px;">
+        <div class="field"><label>Saldo final informado no extrato (R$)</label><input type="number" step="0.01" id="saldoExtratoValor" placeholder="Ex: 15320,45" oninput="atualizarConferenciaSaldo()"></div>
+        <div class="field"><label>Data desse saldo</label><input type="date" id="saldoExtratoData" onchange="atualizarConferenciaSaldo()"></div>
+        <div class="field" style="flex:2;min-width:260px;">
+          <div class="note" id="conferenciaSaldoResumo" style="margin:0;">Informe o saldo final do extrato para conferir se está batendo com o programa.</div>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="conf-table">
+          <thead><tr><th style="width:110px">Data</th><th>Descrição</th><th style="width:110px">Valor (R$)</th><th style="width:90px">Tipo</th><th style="width:170px">Classificação</th><th style="width:160px">OS</th><th style="width:160px">Centro de custo</th><th style="width:150px">Detalhes</th><th style="width:40px"></th></tr></thead>
+          <tbody id="tblConferencia"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn" onclick="confirmarLancamentos()">Confirmar e lançar</button>
+        <button class="btn secondary" onclick="cancelarConferencia()">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="card" id="estoqueConferenciaCard" style="display:none;">
+      <div class="flex-between">
+        <div>
+          <h2>Conferência de entrada (NF de estoque)</h2>
+          <div class="desc">Revise descrição, unidade, quantidade e valor de cada item antes de confirmar a entrada no estoque. Itens com nome parecido a um item já cadastrado serão somados a ele.</div>
+        </div>
+        <button class="btn secondary small" onclick="addStockManualRow()">+ Adicionar item</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="conf-table">
+          <thead><tr><th>Descrição</th><th style="width:90px">Unidade</th><th style="width:100px">Quantidade</th><th style="width:130px">Valor unitário</th><th style="width:130px">Valor total</th><th style="width:40px"></th></tr></thead>
+          <tbody id="tblEstoqueConferencia"></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <div class="field" style="flex:1;min-width:160px;"><label>Fornecedor</label><input type="text" id="nfFornecedor"></div>
+        <div class="field"><label>Nº da NF</label><input type="text" id="nfNumero"></div>
+        <div class="field"><label>Data de entrada</label><input type="date" id="nfData"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn" onclick="confirmarEntradasEstoque()">Confirmar entradas</button>
+        <button class="btn secondary" onclick="cancelarEstoqueConferencia()">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="card" id="revisaoCard" style="display:none;">
+      <h2>Lançamentos marcados para revisão</h2>
+      <div class="desc">Lançamentos que foram confirmados mesmo com algum problema (sem OS obrigatória, sem data/descrição, saldo do extrato não batendo etc). Corrija o que for preciso e marque como revisado.</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Motivo</th><th>Ações</th></tr></thead>
+          <tbody id="tblRevisao"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORTAR -->
+  <div class="tab" id="tab-importar">
+    <div class="card">
+      <h2>Importar extrato — CSV</h2>
+      <div class="desc">Cole o conteúdo do CSV exportado do internet banking, ou selecione o arquivo. Aceita separador ";" ou ",".</div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:260px;">
+          <label>Arquivo CSV</label>
+          <input type="file" id="csvFile" accept=".csv,.txt" onchange="handleCsvFile(event)">
+        </div>
+      </div>
+      <textarea id="csvText" placeholder="Ou cole aqui o conteúdo do CSV..."></textarea>
+      <div style="margin-top:10px;">
+        <button class="btn" onclick="parseCsv()">Processar CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Importar extrato — OFX</h2>
+      <div class="desc">Formato exportado pelo internet banking (Open Financial Exchange). É o mais confiável — leitura estruturada, sem necessidade de interpretar texto.</div>
+      <input type="file" id="ofxFile" accept=".ofx,.qfx" onchange="handleOfxFile(event)">
+      <div class="note" id="ofxStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Importar extrato — PDF</h2>
+      <div class="desc">Extração automática de texto do PDF (requer internet para carregar o leitor). A extração é uma tentativa — sempre confira e ajuste antes de confirmar.</div>
+      <input type="file" id="pdfFile" accept=".pdf" onchange="handlePdfFile(event)">
+      <div class="note" id="pdfStatus"></div>
+    </div>
+
+  </div>
+
+  <!-- LANÇAMENTOS -->
+  <div class="tab" id="tab-lancamentos">
+    <div class="card">
+      <h2>Ordens de serviço (OS)</h2>
+      <div class="desc">Cadastre as OS para poder vincular cada lançamento a uma delas.</div>
+      <div id="osList"></div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field" style="flex:1;min-width:200px;"><label>Nova OS</label><input type="text" id="novaOS" placeholder="Ex: OS 2026-014 — Cliente X"></div>
+        <div class="field"><button class="btn" onclick="addOS()">Adicionar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Lançamentos por mês</h2>
+          <div class="desc">Controle corrente, separado mensalmente. Anexe o comprovante ou gere um recibo quando não houver.</div>
+        </div>
+        <div class="field">
+          <label>Mês</label>
+          <select id="mesSelect" onchange="renderLancamentos()"></select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>OS</th><th>Centro de custo</th><th>Classificação</th><th>Valor</th><th>Anexo</th><th>Ações</th></tr></thead>
+          <tbody id="tblLancamentos"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoMes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Lançamento manual</h2>
+      <div class="row">
+        <div class="field"><label>Data</label><input type="date" id="manData"></div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Descrição</label><input type="text" id="manDesc" placeholder="Descrição"></div>
+        <div class="field"><label>Tipo</label><select id="manTipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="manValor" placeholder="0,00"></div>
+        <div class="field"><label>Centro de custo</label><select id="manCC"></select></div>
+        <div class="field"><label>OS</label><select id="manOS"></select></div>
+        <div class="field"><button class="btn" onclick="addManualLancamento()">Lançar</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BALANCETE -->
+  <div class="tab" id="tab-balancete">
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Balancete anual</h2>
+          <div class="desc">Totais por centro de custo, mês a mês.</div>
+        </div>
+        <div class="field">
+          <label>Ano</label>
+          <select id="anoSelect" onchange="renderBalancete()"></select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="tblBalancete"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Patrimônio (Ativo Imobilizado) — posição atual</h2>
+      <div class="desc">Valor contábil dos bens cadastrados em Patrimônio, na data de hoje.</div>
+      <div style="overflow-x:auto;">
+        <table id="tblPatrimonioBalancete"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Estoque (Almoxarifado) — posição atual</h2>
+      <div class="desc">Valor financeiro parado em estoque (quantidade x custo médio), na data de hoje.</div>
+      <div style="overflow-x:auto;">
+        <table id="tblEstoqueBalancete"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTROS DE CUSTO -->
+  <div class="tab" id="tab-centros">
+    <div class="card">
+      <h2>Centros de custo</h2>
+      <div class="desc">Usados para classificar cada lançamento. Adicione, renomeie removendo e recriando, ou remova os que não usa.</div>
+      <div id="ccList"></div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field" style="flex:1;min-width:200px;"><label>Novo centro de custo</label><input type="text" id="novoCC" placeholder="Ex: Marketing"></div>
+        <div class="field"><button class="btn" onclick="addCC()">Adicionar</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECORRENTES -->
+  <div class="tab" id="tab-recorrentes">
+    <div class="card">
+      <h2>Nova despesa ou receita recorrente</h2>
+      <div class="desc">Cadastre uma vez e, a partir do mês atual, ela é gerada automaticamente todo mês — sem precisar lançar de novo.</div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:200px;"><label>Descrição</label><input type="text" id="recrDesc" placeholder="Ex: Aluguel, Internet, Contrato mensal..."></div>
+        <div class="field"><label>Tipo</label><select id="recrTipo" onchange="updateRecrModoOptions()"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="recrValor" placeholder="0,00"></div>
+        <div class="field"><label>Dia do vencimento</label><input type="number" min="1" max="28" class="small-input" id="recrDia" placeholder="Ex: 5" value="5"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="recrCC"></select></div>
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="recrOS"></select></div>
+        <div class="field">
+          <label>Como lançar todo mês</label>
+          <select id="recrModo">
+            <option value="direto">Lançamento direto (já entra na conta)</option>
+            <option value="pendente">Como pendência (aguarda confirmação de pagamento/recebimento)</option>
+          </select>
+        </div>
+        <div class="field"><button class="btn" onclick="addRecurring()">Cadastrar</button></div>
+      </div>
+      <div class="note">No modo "pendência", cada mês entra em Contas a Pagar (despesa) ou Boletos/NF a receber (receita), do jeito que você já usa nessas abas.</div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Recorrências cadastradas</h2>
+          <div class="desc">Pausar impede novas gerações automáticas, sem apagar o que já foi lançado.</div>
+        </div>
+        <button class="btn secondary small" onclick="processarTodasRecorrencias(false)">Verificar pendências agora</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Dia</th><th>Lançamento</th><th>Última geração</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tblRecurring"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOLETOS/NF A RECEBER -->
+  <div class="tab" id="tab-receber">
+    <div class="card">
+      <h2>Novo boleto / NF emitido</h2>
+      <div class="desc">Registre aqui cada boleto ou nota fiscal emitida para controlar os pagamentos a receber.</div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="recCliente" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Tipo</label><select id="recTipo"><option value="Boleto">Boleto</option><option value="NF">NF</option><option value="NF+Boleto">NF + Boleto</option></select></div>
+        <div class="field"><label>Número</label><input type="text" id="recNumero" class="small-input" placeholder="Nº"></div>
+        <div class="field"><label>Emissão</label><input type="date" id="recEmissao"></div>
+        <div class="field"><label>Vencimento</label><input type="date" id="recVencimento"></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="recValor" class="small-input" placeholder="0,00"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="recOS"></select></div>
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="recCC"></select></div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="recNota" placeholder="Opcional"></div>
+        <div class="field"><button class="btn" onclick="addReceivable()">Registrar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Importar relatório de boletos (Sicredi)</h2>
+      <div class="desc">Importe o "Relatório de Boletos" (.xls/.xlsx) direto do internet banking — ele adiciona os boletos novos e atualiza para "Recebido" os que já foram liquidados, sem duplicar. Pode importar o mesmo relatório de novo mais pra frente, só com os títulos atualizados.</div>
+      <input type="file" id="boletosReportFile" accept=".xls,.xlsx" onchange="handleBoletosReportFile(event)">
+      <div class="note" id="boletosImportStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Pagamentos a receber</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Cliente</th><th>Tipo/Nº</th><th>Emissão</th><th>Vencimento</th><th>Valor</th><th>OS</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tblReceivables"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoReceivables"></div>
+    </div>
+  </div>
+
+  <!-- CONTAS A PAGAR -->
+  <div class="tab" id="tab-pagar">
+    <div class="card">
+      <h2>Nova conta a pagar</h2>
+      <div class="desc">Registre aqui os pagamentos a fazer para controlar vencimentos.</div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:180px;"><label>Fornecedor / Descrição</label><input type="text" id="pagDescricao" placeholder="Ex: Fornecedor X — material"></div>
+        <div class="field"><label>Vencimento</label><input type="date" id="pagVencimento"></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="pagValor" class="small-input" placeholder="0,00"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="pagCC"></select></div>
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="pagOS"></select></div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="pagNota" placeholder="Opcional"></div>
+        <div class="field"><button class="btn" onclick="addPayable()">Registrar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Contas a pagar</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Fornecedor / Descrição</th><th>Vencimento</th><th>Valor</th><th>Centro de custo</th><th>OS</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tblPayables"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoPayables"></div>
+    </div>
+  </div>
+
+  <!-- SÓCIOS -->
+  <div class="tab" id="tab-socios">
+    <div class="card">
+      <h2>Sócios</h2>
+      <div class="desc">Cadastre os sócios para lançar pró-labore e distribuição de lucro de cada um.</div>
+      <div id="partnersList"></div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field" style="flex:1;min-width:200px;"><label>Novo sócio</label><input type="text" id="novoSocio" placeholder="Nome do sócio"></div>
+        <div class="field"><button class="btn" onclick="addPartner()">Adicionar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lançar pró-labore / distribuição</h2>
+      <div class="row">
+        <div class="field"><label>Data</label><input type="date" id="socData"></div>
+        <div class="field"><label>Sócio</label><select id="socPartner"></select></div>
+        <div class="field"><label>Tipo</label><select id="socTipo"><option value="pro-labore">Pró-labore</option><option value="distribuicao">Distribuição de lucro</option></select></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="socValor" placeholder="0,00"></div>
+        <div class="field" style="flex:1;min-width:160px;"><label>Observação</label><input type="text" id="socNota" placeholder="Opcional"></div>
+        <div class="field"><button class="btn" onclick="addPartnerPayment()">Lançar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <h2>Detalhamento por sócio</h2>
+          <div class="desc">Pró-labore e distribuição de lucro, mês a mês.</div>
+        </div>
+        <div class="field">
+          <label>Ano</label>
+          <select id="anoSelectSocios" onchange="renderSocios()"></select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="tblSocios"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lançamentos de sócios</h2>
+      <table>
+        <thead><tr><th>Data</th><th>Sócio</th><th>Tipo</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
+        <tbody id="tblSociosLancamentos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PATRIMÔNIO -->
+  <div class="tab" id="tab-patrimonio">
+    <div class="card">
+      <h2>Novo item de patrimônio</h2>
+      <div class="desc">Cadastre os bens da empresa (veículos, máquinas, móveis, equipamentos...) para acompanhar o valor contábil no Balancete.</div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:200px;"><label>Descrição</label><input type="text" id="ativoDesc" placeholder="Ex: Notebook Dell, Veículo Fiat Toro..."></div>
+        <div class="field"><label>Categoria</label>
+          <select id="ativoCategoria">
+            <option>Veículos</option>
+            <option>Máquinas e Equipamentos</option>
+            <option>Mobiliário e Utensílios</option>
+            <option>Equipamentos de Informática</option>
+            <option>Imóveis</option>
+            <option>Outros</option>
+          </select>
+        </div>
+        <div class="field"><label>Data de aquisição</label><input type="date" id="ativoData"></div>
+        <div class="field"><label>Valor de aquisição (R$)</label><input type="number" step="0.01" id="ativoValor" placeholder="0,00"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Vida útil (anos)</label><input type="number" step="1" min="1" class="small-input" id="ativoVidaUtil" placeholder="Opcional"></div>
+        <div class="field"><label>Valor residual (R$)</label><input type="number" step="0.01" class="small-input" id="ativoValorResidual" placeholder="0,00"></div>
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="ativoCC"></select></div>
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="ativoOS"></select></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:160px;"><label>Fornecedor</label><input type="text" id="ativoFornecedor" placeholder="Opcional"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Nº da NF</label><input type="text" id="ativoNumeroNF" placeholder="Opcional"></div>
+        <div class="field"><label>Nota fiscal / comprovante</label><input type="file" id="ativoAnexoFile"></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="ativoGerarLancamento" checked style="width:auto;">
+            Lançar a compra como despesa no financeiro agora
+          </label>
+        </div>
+        <div class="field"><button class="btn" onclick="addAsset()">Cadastrar</button></div>
+      </div>
+      <div class="note">Desmarque a opção acima se essa compra já foi lançada (por exemplo, já veio do extrato importado), para não duplicar a despesa.</div>
+      <div class="note">Sem vida útil informada, o bem não deprecia e aparece pelo valor de aquisição (ex: imóveis, terrenos).</div>
+    </div>
+
+    <div class="card">
+      <h2>Importar planilha de patrimônio</h2>
+      <div class="desc">Importe uma planilha (.xlsx/.xls) com os bens já cadastrados em outra planilha (ex: controle antigo de patrimônio). O importador procura automaticamente colunas como "Descrição", "Data de compra", "Valor", "NF" e "Observação" em cada aba do arquivo, e ignora abas que não parecerem ser de patrimônio. Itens já importados antes não são duplicados em uma nova importação do mesmo arquivo.</div>
+      <div class="row">
+        <div class="field"><label>Vida útil padrão (anos) para itens sem taxa informada na planilha</label><input type="number" step="1" min="1" class="small-input" id="patrimonioVidaUtilPadrao" placeholder="Deixe vazio p/ não depreciar"></div>
+        <div class="field"><label>Arquivo da planilha</label><input type="file" id="patrimonioImportFile" accept=".xls,.xlsx" onchange="handlePatrimonioImportFile(event)"></div>
+      </div>
+      <div class="note">Os itens importados <b>não</b> geram despesa automática nos Lançamentos/Balancete (são bens já existentes, só para controle do valor contábil e depreciação). Se quiser, cadastre manualmente qualquer item que ainda precise ser lançado como despesa.</div>
+      <div class="note" id="patrimonioImportStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Itens cadastrados</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Aquisição</th><th>Vida útil</th><th>Valor contábil atual</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
+          <tbody id="tblAssets"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoAssets"></div>
+    </div>
+  </div>
+
+  <!-- ESTOQUE -->
+  <div class="tab" id="tab-estoque">
+    <div class="card">
+      <h2>Importar Nota Fiscal (entrada de estoque)</h2>
+      <div class="desc">Envie o XML da NF-e (mais preciso) ou o PDF do DANFE. O sistema tenta extrair automaticamente a descrição, quantidade, unidade e valor de cada item para você revisar antes de confirmar a entrada no estoque.</div>
+      <div class="row">
+        <div class="field"><label>Arquivo da NF</label><input type="file" id="nfFile" accept=".xml,.pdf" onchange="handleNFFile(event)"></div>
+      </div>
+      <div class="note" id="nfImportStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Registrar movimentação manual</h2>
+      <div class="desc">Para saídas (uso de material em uma OS) ou ajustes/entradas manuais sem NF.</div>
+      <div class="row">
+        <div class="field"><label>Tipo</label>
+          <select id="movTipo" onchange="atualizarCamposMovimento()">
+            <option value="saida">Saída (uso/consumo)</option>
+            <option value="entrada">Entrada manual</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Item</label>
+          <select id="movItem" class="stock-item-select-target"></select>
+        </div>
+        <div class="field"><label>Quantidade</label><input type="number" step="0.01" id="movQuantidade"></div>
+      </div>
+      <div class="row">
+        <div class="field" id="movValorField"><label>Valor unitário (R$)</label><input type="number" step="0.01" id="movValorUnitario" placeholder="0,00"></div>
+        <div class="field" id="movOSField"><label>OS (uso do material)</label><select id="movOS" class="os-select-target"></select></div>
+        <div class="field"><label>Data</label><input type="date" id="movData"></div>
+        <div class="field" style="flex:1;min-width:160px;"><label>Observação</label><input type="text" id="movNota" placeholder="Opcional"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:200px;"><label>Novo item (se não existir na lista)</label><input type="text" id="movItemNovoNome" placeholder="Nome do novo item"></div>
+        <div class="field"><label>Unidade do novo item</label><input type="text" id="movItemNovaUnidade" placeholder="Ex: UN, KG, CX" class="small-input"></div>
+        <div class="field"><button class="btn" onclick="addMovimentoManual()">Registrar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Itens em estoque</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Item</th><th>Unidade</th><th>Quantidade atual</th><th>Custo médio</th><th>Valor em estoque</th><th>Ações</th></tr></thead>
+          <tbody id="tblStockItems"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoEstoque"></div>
+    </div>
+
+    <div class="card">
+      <h2>Histórico de movimentações</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Quantidade</th><th>Valor unitário</th><th>Valor total</th><th>OS</th><th>Observação</th><th>Ações</th></tr></thead>
+          <tbody id="tblStockMovements"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="attachInput" style="display:none" onchange="handleAttachmentSelected(event)">
+
+<script>
+/* ==================== ESTADO / PERSISTÊNCIA ==================== */
+const DEFAULT_CC = ["Administrativo","Operacional","Impostos e Taxas","Bancário/Tarifas","Fornecedores","Sócios","Outros"];
+
+/* ==================== CLASSIFICAÇÃO (Fixo/Variável) ==================== */
+const CLASSIFICACOES = ["Despesas Administrativas","Despesas Operacionais","Serviço Terceirizado","Almoxarifado","Taxas Bancárias","Imposto","Pró-labore","Divisão de Lucros","Patrimônio/Investimento"];
+const TIPO_CUSTO_POR_CLASSIFICACAO = {
+  "Despesas Administrativas": "Fixo",
+  "Despesas Operacionais": "Variável",
+  "Serviço Terceirizado": "Variável",
+  "Almoxarifado": "Variável",
+  "Taxas Bancárias": "Fixo",
+  "Imposto": "Fixo",
+  "Pró-labore": "Fixo",
+  "Divisão de Lucros": "Resultado",
+  "Patrimônio/Investimento": "Investimento"
+};
+// Nomes informados por Jessica (equipe/prestadores) para ajudar a sugestão automática de classificação.
+const FUNCIONARIOS_FIXOS = ["guilherme colombo mariano","jose vitor da silva cardoso","josé vitor da silva cardoso"];
+const PRESTADORES_DEMANDA = ["maicon","luis carlos blissari","sidemar","mateus batista","thiago guolo","polaris clima"];
+const OS_ESTOQUE = "Estoque";
+
+function derivarTipoCusto(classificacao, descricao){
+  if(!classificacao) return "";
+  if(classificacao === "Imposto"){
+    const d = (descricao||"").toLowerCase();
+    if(d.includes("simples nacional") || /\bdas\b/.test(d)) return "Variável";
+    return "Fixo";
+  }
+  return TIPO_CUSTO_POR_CLASSIFICACAO[classificacao] || "";
+}
+function sugerirClassificacao(descricao, valor){
+  const d = (descricao||"").toLowerCase();
+  if(valor>0) return ""; // receitas não entram nesta classificação por enquanto
+  if(FUNCIONARIOS_FIXOS.some(n=>d.includes(n))) return "Despesas Administrativas";
+  if(PRESTADORES_DEMANDA.some(n=>d.includes(n))) return "Serviço Terceirizado";
+  if(/pr[óo].?labore/.test(d)) return "Pró-labore";
+  if(/distribui[cç][aã]o de lucro|divis[aã]o de lucro/.test(d)) return "Divisão de Lucros";
+  if(/simples nacional|\bdas\b|\binss\b|\bfgts\b|\bdarf\b|\birrf\b|\biss\b|imposto/.test(d)) return "Imposto";
+  if(/tarifa|manuten[cç][aã]o de conta|anuidade|pacote de servi[cç]os banc[áa]rios|\bted\b|\bdoc\b/.test(d)) return "Taxas Bancárias";
+  if(/almoxarifado|material de escrit[óo]rio|\bepi\b|ferramenta/.test(d)) return "Almoxarifado";
+  if(/patrim[oô]nio|imobilizado|ativo imobilizado|compra de (ve[íi]culo|m[áa]quina|equipamento|notebook|computador|im[óo]vel|m[óo]vel)/.test(d)) return "Patrimônio/Investimento";
+  return "Despesas Operacionais";
+}
+function garantirOSEstoque(){
+  if(!state.serviceOrders.includes(OS_ESTOQUE)) state.serviceOrders.push(OS_ESTOQUE);
+}
+function proximoCodigoPatrimonio(){
+  let max = 0;
+  state.assets.forEach(a=>{
+    if(a.codigoPatrimonio && /^\d+$/.test(a.codigoPatrimonio)){
+      const n = parseInt(a.codigoPatrimonio,10);
+      if(n>max) max = n;
+    }
+  });
+  return String(max+1).padStart(6,"0");
+}
+const STORAGE_KEY = "wolfFinanceiroData_v1";
+
+let state = {
+  costCenters: [...DEFAULT_CC],
+  serviceOrders: [],
+  transactions: [], // {id, date:'YYYY-MM-DD', description, value(+/-), costCenter, serviceOrder, source, note, attachment:{name,type,dataUrl,size}|null}
+  receivables: [], // {id, cliente, tipo, numero, dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido', dataRecebimento, linkedTxId}
+  payables: [], // {id, descricao, vencimento, valor, costCenter, serviceOrder, note, status:'pendente'|'pago', dataPagamento, linkedTxId}
+  partners: [], // ['Alex','Bruno/Jessica']
+  partnerPayments: [], // {id, date, partner, tipo:'pro-labore'|'distribuicao', value, note}
+  recurring: [], // {id, descricao, tipo:'despesa'|'receita', valor, diaVencimento, costCenter, serviceOrder, modo:'direto'|'pendente', ativo, ultimaCompetencia:'YYYY-MM'}
+  assets: [], // {id, descricao, categoria, dataAquisicao, valorAquisicao, vidaUtilAnos, valorResidual, costCenter, serviceOrder, fornecedor, numeroNF, attachment, status:'ativo'|'baixado', dataBaixa, valorBaixa, linkedTxId, linkedBaixaTxId}
+  stockItems: [], // {id, nome, unidade}
+  stockMovements: [], // {id, date, itemId, tipo:'entrada'|'saida', quantidade, valorUnitario, serviceOrder, note, linkedTxId}
+  saldoInicial: 0,
+  metaFaturamentoMensal: 35000
+};
+let pendingAttachId = null;
+
+/* ==================== PASTA DE ANEXOS (OneDrive/local, via File System Access API) ==================== */
+let anexosDirHandle = null;
+let anexosDirStatus = "nenhuma"; // 'nenhuma' | 'ok' | 'pendente'
+const FS_DB_NAME = "wolfFinanceiroFS";
+const FS_STORE = "handles";
+
+function openFsDb(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(FS_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(FS_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function salvarHandleAnexos(handle){
+  try{
+    const db = await openFsDb();
+    await new Promise((res,rej)=>{
+      const tx = db.transaction(FS_STORE, "readwrite");
+      tx.objectStore(FS_STORE).put(handle, "anexosDir");
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }catch(e){ console.warn("Não foi possível salvar a referência da pasta:", e); }
+}
+async function carregarHandleAnexos(){
+  try{
+    const db = await openFsDb();
+    return await new Promise((res,rej)=>{
+      const tx = db.transaction(FS_STORE, "readonly");
+      const req = tx.objectStore(FS_STORE).get("anexosDir");
+      req.onsuccess = () => res(req.result || null);
+      req.onerror = () => rej(req.error);
+    });
+  }catch(e){ return null; }
+}
+function atualizarBadgePastaAnexos(){
+  const el = document.getElementById("pastaAnexosStatus");
+  if(!el) return;
+  if(!window.showDirectoryPicker){
+    el.innerHTML = "";
+    return;
+  }
+  if(!anexosDirHandle){
+    el.innerHTML = `<button onclick="vincularPastaAnexos()">📁 Vincular pasta de anexos</button>`;
+  } else if(anexosDirStatus === "ok"){
+    el.innerHTML = `📁 Anexos em: <b>${anexosDirHandle.name}</b> <button onclick="vincularPastaAnexos()">Trocar</button>`;
+  } else {
+    el.innerHTML = `📁 Pasta "${anexosDirHandle.name}" <button onclick="reconectarPastaAnexos()">Confirmar acesso</button>`;
+  }
+}
+async function vincularPastaAnexos(){
+  if(!window.showDirectoryPicker){
+    alert("Seu navegador não tem suporte a essa função. Use Chrome ou Edge atualizados.");
+    return;
+  }
+  try{
+    const handle = await window.showDirectoryPicker();
+    const perm = await handle.requestPermission({mode:"readwrite"});
+    anexosDirHandle = handle;
+    anexosDirStatus = perm === "granted" ? "ok" : "pendente";
+    await salvarHandleAnexos(handle);
+    atualizarBadgePastaAnexos();
+    if(anexosDirStatus === "ok") toast(`Pasta "${handle.name}" vinculada para os anexos.`);
+  }catch(e){
+    if(e.name !== "AbortError") alert("Não foi possível vincular a pasta: " + e.message);
+  }
+}
+async function reconectarPastaAnexos(){
+  if(!anexosDirHandle) return;
+  try{
+    const perm = await anexosDirHandle.requestPermission({mode:"readwrite"});
+    anexosDirStatus = perm === "granted" ? "ok" : "pendente";
+    toast(anexosDirStatus==="ok" ? "Acesso à pasta de anexos confirmado." : "Acesso à pasta não foi concedido.");
+  }catch(e){
+    anexosDirStatus = "pendente";
+  }
+  atualizarBadgePastaAnexos();
+}
+async function initAnexosDir(){
+  if(!window.showDirectoryPicker) return;
+  const handle = await carregarHandleAnexos();
+  if(!handle) { atualizarBadgePastaAnexos(); return; }
+  anexosDirHandle = handle;
+  try{
+    const perm = await handle.queryPermission({mode:"readwrite"});
+    anexosDirStatus = perm === "granted" ? "ok" : "pendente";
+  }catch(e){
+    anexosDirStatus = "pendente";
+  }
+  atualizarBadgePastaAnexos();
+}
+async function arquivoExisteNaPasta(nome){
+  try{ await anexosDirHandle.getFileHandle(nome); return true; }catch(e){ return false; }
+}
+async function salvarArquivoNaPasta(file, nomeSugerido){
+  if(!anexosDirHandle || anexosDirStatus !== "ok") return null;
+  try{
+    let nomeFinal = nomeSugerido;
+    let i = 1;
+    while(await arquivoExisteNaPasta(nomeFinal) && i < 50){
+      const dot = nomeSugerido.lastIndexOf(".");
+      nomeFinal = dot>0 ? `${nomeSugerido.slice(0,dot)} (${i})${nomeSugerido.slice(dot)}` : `${nomeSugerido} (${i})`;
+      i++;
+    }
+    const fh = await anexosDirHandle.getFileHandle(nomeFinal, {create:true});
+    const writable = await fh.createWritable();
+    await writable.write(file);
+    await writable.close();
+    return nomeFinal;
+  }catch(e){
+    console.warn("Falha ao salvar na pasta vinculada:", e);
+    return null;
+  }
+}
+async function abrirArquivoDaPasta(nome){
+  if(!anexosDirHandle){ alert("A pasta de anexos não está vinculada nesta sessão."); return; }
+  try{
+    if(anexosDirStatus !== "ok") await reconectarPastaAnexos();
+    const fh = await anexosDirHandle.getFileHandle(nome);
+    const file = await fh.getFile();
+    const url = URL.createObjectURL(file);
+    window.open(url, "_blank");
+  }catch(e){
+    alert("Não consegui abrir o arquivo na pasta vinculada. Confirme o acesso à pasta e tente de novo.\n" + e.message);
+  }
+}
+function slugify(s){
+  return (s||"anexo").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || "anexo";
+}
+async function construirAnexo(file, descricaoBase, dataRef){
+  if(!file) return null;
+  const dataPart = (dataRef || todayStr()).replace(/-/g,"");
+  const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+  const nomeSugerido = `${dataPart}_${slugify(descricaoBase)}${ext}`;
+  if(anexosDirHandle && anexosDirStatus === "ok"){
+    const nomeFinal = await salvarArquivoNaPasta(file, nomeSugerido);
+    if(nomeFinal){
+      return {name:file.name, type:file.type, size:file.size, storage:"folder", folderFileName:nomeFinal, folderName:anexosDirHandle.name};
+    }
+  }
+  return await new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = e => resolve({name:file.name, type:file.type, size:file.size, storage:"embed", dataUrl:e.target.result});
+    reader.readAsDataURL(file);
+  });
+}
+function abrirAnexo(attachment){
+  if(!attachment) return;
+  if(attachment.storage === "folder"){
+    abrirArquivoDaPasta(attachment.folderFileName);
+  } else if(attachment.dataUrl){
+    window.open(attachment.dataUrl, "_blank");
+  }
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign(state, parsed);
+    }
+  }catch(e){ console.warn("Não foi possível ler o cache local:", e); }
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ console.warn("Não foi possível salvar no cache local:", e); }
+}
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `wolf-financeiro-backup-${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast("Backup exportado.");
+}
+function importData(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed.transactions || !parsed.costCenters) throw new Error("formato inválido");
+      state = parsed;
+      saveState();
+      renderAll();
+      toast("Dados importados com sucesso.");
+    }catch(err){
+      alert("Não foi possível ler este arquivo: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = "";
+}
+
+/* ==================== SINCRONIZAÇÃO COM GOOGLE DRIVE ====================
+   Configuração necessária (uma vez só, feita no Google Cloud Console):
+   1. Crie um projeto e ative a "Google Drive API".
+   2. Configure a tela de consentimento OAuth (tipo "Externo", modo "Testing",
+      adicione seu e-mail como usuário de teste).
+   3. Crie uma credencial "ID do cliente OAuth" do tipo "Aplicativo da Web",
+      com "Origens JavaScript autorizadas" = o endereço onde este arquivo
+      está hospedado (ex: https://seuusuario.github.io).
+   4. Cole o Client ID abaixo, no lugar de COLE_SEU_CLIENT_ID_AQUI.
+   Esse arquivo só é lido/gravado por este app na sua própria conta do
+   Google Drive (escopo drive.file) — nenhum outro dado ou pasta é acessado. */
+const GOOGLE_CLIENT_ID = "COLE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_FILE_NAME = "wolf-financeiro-nuvem.json";
+const DRIVE_META_KEY = "wolfFinanceiroDriveMeta_v1";
+
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveTokenExpiresAt = 0;
+
+function driveMetaLoad(){
+  try{ return JSON.parse(localStorage.getItem(DRIVE_META_KEY)) || {}; }catch(e){ return {}; }
+}
+function driveMetaSave(meta){
+  try{ localStorage.setItem(DRIVE_META_KEY, JSON.stringify(meta)); }catch(e){}
+}
+function driveStatusMsg(msg){
+  const el = document.getElementById("driveStatus");
+  if(el) el.textContent = msg;
+}
+
+function conectarGoogleDrive(){
+  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith("COLE_SEU_CLIENT_ID")){
+    alert("A conexão com o Google Drive ainda não foi configurada neste arquivo.\n\nÉ preciso criar o Client ID no Google Cloud Console e colocá-lo no código (procure por GOOGLE_CLIENT_ID no arquivo).");
+    return;
+  }
+  if(typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
+    alert("Não foi possível carregar o serviço de login do Google. Verifique sua conexão com a internet e recarregue a página.");
+    return;
+  }
+  if(!driveTokenClient){
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        if(resp.error){
+          driveStatusMsg("Falha ao conectar.");
+          alert("Não foi possível conectar ao Google Drive: " + resp.error);
+          return;
+        }
+        driveAccessToken = resp.access_token;
+        driveTokenExpiresAt = Date.now() + (resp.expires_in||3600)*1000 - 60000;
+        document.getElementById("btnConectarDrive").textContent = "☁ Conectado ao Google Drive";
+        document.getElementById("btnSalvarNuvem").style.display = "";
+        document.getElementById("btnCarregarNuvem").style.display = "";
+        const meta = driveMetaLoad();
+        driveStatusMsg(meta.lastSync ? `Última sincronização: ${new Date(meta.lastSync).toLocaleString('pt-BR')}` : "Conectado. Nenhuma sincronização ainda.");
+      },
+    });
+  }
+  driveTokenClient.requestAccessToken();
+}
+
+async function driveEncontrarArquivo(){
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`)}&fields=files(id,name,modifiedTime)`, {
+    headers: { Authorization: `Bearer ${driveAccessToken}` }
+  });
+  if(!resp.ok) throw new Error("Falha ao consultar o Google Drive (" + resp.status + ")");
+  const data = await resp.json();
+  return (data.files && data.files[0]) || null;
+}
+
+async function salvarNaNuvem(){
+  if(!driveAccessToken){ alert("Conecte-se ao Google Drive primeiro."); return; }
+  driveStatusMsg("Salvando na nuvem...");
+  try{
+    const existente = await driveEncontrarArquivo();
+    const conteudo = JSON.stringify(state, null, 2);
+    const meta = driveMetaLoad();
+    if(existente){
+      const resp = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existente.id}?uploadType=media`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${driveAccessToken}`, "Content-Type": "application/json" },
+        body: conteudo
+      });
+      if(!resp.ok) throw new Error("Falha ao atualizar o arquivo na nuvem (" + resp.status + ")");
+      meta.fileId = existente.id;
+    } else {
+      const boundary = "wolfFinanceiroBoundary";
+      const metadataPart = JSON.stringify({ name: DRIVE_FILE_NAME, mimeType: "application/json" });
+      const body =
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadataPart}\r\n` +
+        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${conteudo}\r\n--${boundary}--`;
+      const resp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${driveAccessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+        body
+      });
+      if(!resp.ok) throw new Error("Falha ao criar o arquivo na nuvem (" + resp.status + ")");
+      const criado = await resp.json();
+      meta.fileId = criado.id;
+    }
+    meta.lastSync = Date.now();
+    driveMetaSave(meta);
+    driveStatusMsg(`Salvo na nuvem em ${new Date(meta.lastSync).toLocaleString('pt-BR')}`);
+    toast("Dados salvos no Google Drive.");
+  }catch(err){
+    driveStatusMsg("Falha ao salvar na nuvem.");
+    alert("Não foi possível salvar no Google Drive: " + err.message);
+  }
+}
+
+async function carregarDaNuvem(){
+  if(!driveAccessToken){ alert("Conecte-se ao Google Drive primeiro."); return; }
+  driveStatusMsg("Verificando dados na nuvem...");
+  try{
+    const existente = await driveEncontrarArquivo();
+    if(!existente){
+      driveStatusMsg("Nenhum backup encontrado na nuvem ainda.");
+      alert("Ainda não existe nenhum backup salvo no Google Drive. Use \"Salvar na nuvem\" primeiro, em algum dos seus dispositivos.");
+      return;
+    }
+    if(!confirm(`Foi encontrado um backup na nuvem, modificado em ${new Date(existente.modifiedTime).toLocaleString('pt-BR')}.\n\nCarregar esse backup vai SUBSTITUIR todos os dados atuais deste dispositivo. Deseja continuar?`)){
+      driveStatusMsg("Carregamento cancelado.");
+      return;
+    }
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${existente.id}?alt=media`, {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if(!resp.ok) throw new Error("Falha ao baixar o arquivo da nuvem (" + resp.status + ")");
+    const parsed = await resp.json();
+    if(!parsed.transactions || !parsed.costCenters) throw new Error("o arquivo da nuvem não parece ser um backup válido");
+    state = parsed;
+    saveState();
+    renderAll();
+    const meta = driveMetaLoad();
+    meta.fileId = existente.id;
+    meta.lastSync = Date.now();
+    driveMetaSave(meta);
+    driveStatusMsg(`Carregado da nuvem em ${new Date(meta.lastSync).toLocaleString('pt-BR')}`);
+    toast("Dados carregados do Google Drive.");
+  }catch(err){
+    driveStatusMsg("Falha ao carregar da nuvem.");
+    alert("Não foi possível carregar do Google Drive: " + err.message);
+  }
+}
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2600);
+}
+
+/* ==================== NAVEGAÇÃO ==================== */
+function irParaAba(tab){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  const tabEl = document.getElementById("tab-"+tab);
+  if(tabEl) tabEl.classList.add("active");
+  if(tab==="painel") renderPainel();
+  if(tab==="conferencias") renderConferenciasPendentes();
+  if(tab==="lancamentos") renderLancamentos();
+  if(tab==="balancete") renderBalancete();
+  if(tab==="centros") renderCC();
+  if(tab==="recorrentes") renderRecurring();
+  if(tab==="receber") renderReceivables();
+  if(tab==="pagar") renderPayables();
+  if(tab==="socios") renderSocios();
+  if(tab==="patrimonio") renderAssets();
+  if(tab==="estoque") renderEstoque();
+}
+document.getElementById("nav").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-tab]");
+  if(!btn) return;
+  irParaAba(btn.dataset.tab);
+});
+
+/* ==================== HELPERS ==================== */
+function fmtBRL(v){
+  const n = Number(v)||0;
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+function monthKey(dateStr){ return (dateStr||"").slice(0,7); } // YYYY-MM
+function monthLabel(key){
+  if(!key) return "";
+  const [y,m] = key.split("-");
+  const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  return `${meses[parseInt(m,10)-1]}/${y}`;
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function allMonthsSorted(){
+  const set = new Set(state.transactions.map(t=>monthKey(t.date)));
+  return [...set].sort();
+}
+function allYearsSorted(){
+  const set = new Set(state.transactions.map(t=>t.date.slice(0,4)));
+  const arr = [...set].sort();
+  const nowY = String(new Date().getFullYear());
+  if(!arr.includes(nowY)) arr.push(nowY);
+  return arr.sort();
+}
+function setSaldoInicial(v){ state.saldoInicial = parseFloat(v)||0; saveState(); renderPainel(); }
+function setMetaFaturamento(v){ state.metaFaturamentoMensal = parseFloat(v)||0; saveState(); renderPainel(); }
+function ultimoDiaMes(mesKey){
+  const [y,m] = (mesKey||"").split("-").map(Number);
+  if(!y || !m) return mesKey;
+  const last = new Date(y, m, 0).getDate();
+  return `${mesKey}-${String(last).padStart(2,"0")}`;
+}
+
+/* ==================== CENTROS DE CUSTO ==================== */
+function renderCC(){
+  const box = document.getElementById("ccList");
+  box.innerHTML = "";
+  state.costCenters.forEach(cc=>{
+    const chip = document.createElement("span");
+    chip.className = "cc-chip";
+    chip.innerHTML = `${cc} <span class="tag-remove" onclick="removeCC('${cc.replace(/'/g,"\\'")}')">✕</span>`;
+    box.appendChild(chip);
+  });
+  fillCCSelects();
+}
+function addCC(){
+  const input = document.getElementById("novoCC");
+  const v = input.value.trim();
+  if(!v) return;
+  if(state.costCenters.includes(v)){ toast("Já existe."); return; }
+  state.costCenters.push(v);
+  input.value="";
+  saveState(); renderCC();
+}
+function removeCC(cc){
+  const inUse = state.transactions.some(t=>t.costCenter===cc);
+  if(inUse && !confirm(`"${cc}" está em uso em lançamentos existentes. Remover mesmo assim? Os lançamentos ficarão sem classificação.`)) return;
+  state.costCenters = state.costCenters.filter(c=>c!==cc);
+  state.transactions.forEach(t=>{ if(t.costCenter===cc) t.costCenter=""; });
+  saveState(); renderCC();
+}
+function fillCCSelects(){
+  document.querySelectorAll(".cc-select-target").forEach(sel=>{
+    const current = sel.value;
+    sel.innerHTML = `<option value="">— selecionar —</option>` + state.costCenters.map(c=>`<option value="${c}">${c}</option>`).join("");
+    if(current) sel.value = current;
+  });
+  const manCC = document.getElementById("manCC");
+  manCC.innerHTML = state.costCenters.map(c=>`<option value="${c}">${c}</option>`).join("");
+}
+
+/* ==================== ORDENS DE SERVIÇO ==================== */
+function renderOS(){
+  const box = document.getElementById("osList");
+  if(!box) return;
+  box.innerHTML = state.serviceOrders.length ? "" : `<span class="note">Nenhuma OS cadastrada ainda.</span>`;
+  state.serviceOrders.forEach(os=>{
+    const chip = document.createElement("span");
+    chip.className = "cc-chip";
+    chip.innerHTML = `${os} <span class="tag-remove" onclick="removeOS('${os.replace(/'/g,"\\'")}')">✕</span>`;
+    box.appendChild(chip);
+  });
+  fillOSSelects();
+}
+function addOS(){
+  const input = document.getElementById("novaOS");
+  const v = input.value.trim();
+  if(!v) return;
+  if(state.serviceOrders.includes(v)){ toast("Já existe."); return; }
+  state.serviceOrders.push(v);
+  input.value="";
+  saveState(); renderOS();
+}
+function removeOS(os){
+  const inUse = state.transactions.some(t=>t.serviceOrder===os);
+  if(inUse && !confirm(`"${os}" está em uso em lançamentos existentes. Remover mesmo assim? Os lançamentos ficarão sem OS vinculada.`)) return;
+  state.serviceOrders = state.serviceOrders.filter(o=>o!==os);
+  state.transactions.forEach(t=>{ if(t.serviceOrder===os) t.serviceOrder=""; });
+  saveState(); renderOS();
+}
+function fillOSSelects(){
+  document.querySelectorAll(".os-select-target").forEach(sel=>{
+    const current = sel.value;
+    sel.innerHTML = `<option value="">— sem OS —</option>` + state.serviceOrders.map(o=>`<option value="${o}">${o}</option>`).join("");
+    if(current) sel.value = current;
+  });
+  const manOS = document.getElementById("manOS");
+  if(manOS) manOS.innerHTML = `<option value="">— sem OS —</option>` + state.serviceOrders.map(o=>`<option value="${o}">${o}</option>`).join("");
+}
+function updateTxOS(id, os){
+  const t = state.transactions.find(t=>t.id===id);
+  if(t){ t.serviceOrder = os; saveState(); }
+}
+
+/* ==================== IMPORTAÇÃO CSV ==================== */
+function handleCsvFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById("csvText").value = e.target.result; };
+  reader.readAsText(file, "ISO-8859-1"); // extratos BR costumam vir em latin1
+}
+
+function detectDelimiter(line){
+  const semi = (line.match(/;/g)||[]).length;
+  const comma = (line.match(/,/g)||[]).length;
+  return semi >= comma ? ";" : ",";
+}
+
+function parseBRNumber(str){
+  if(typeof str === "number") return str;
+  if(!str) return NaN;
+  let s = String(str).trim().replace(/R\$\s?/i,"");
+  const neg = /^\(.*\)$/.test(s) || /D$/i.test(s.trim());
+  s = s.replace(/[()]/g,"").replace(/\s?[DC]$/i,"").trim();
+  // formato BR: milhar com ponto, decimal com vírgula
+  if(/,\d{1,2}$/.test(s)){
+    s = s.replace(/\./g,"").replace(",",".");
+  }
+  const n = parseFloat(s);
+  if(isNaN(n)) return NaN;
+  return neg ? -Math.abs(n) : n;
+}
+
+function parseDateFlexible(str){
+  if(!str) return null;
+  str = str.trim();
+  let m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/aaaa
+  if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = str.match(/^(\d{2})\/(\d{2})\/(\d{2})$/); // dd/mm/aa
+  if(m) return `20${m[3]}-${m[2]}-${m[1]}`;
+  m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/); // aaaa-mm-dd
+  if(m) return str;
+  return null;
+}
+
+function parseCsvLine(line, delim){
+  // parser simples com suporte a aspas
+  const out = []; let cur = ""; let inQ = false;
+  for(let i=0;i<line.length;i++){
+    const c = line[i];
+    if(c === '"'){ inQ = !inQ; continue; }
+    if(c === delim && !inQ){ out.push(cur); cur=""; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+
+function parseCsv(){
+  const text = document.getElementById("csvText").value;
+  if(!text.trim()){ alert("Cole ou selecione um arquivo CSV primeiro."); return; }
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+  if(!lines.length) return;
+  const delim = detectDelimiter(lines[0]);
+  let rows = lines.map(l=>parseCsvLine(l, delim));
+
+  // tenta identificar cabeçalho
+  const headerCandidates = rows[0].map(h=>h.toLowerCase());
+  const hasHeader = headerCandidates.some(h=>/data|hist|descri|valor|lan[cç]amento/.test(h));
+  let idxData=0, idxDesc=1, idxValor=2, idxSaldo=-1;
+  if(hasHeader){
+    idxData = headerCandidates.findIndex(h=>/data/.test(h));
+    idxDesc = headerCandidates.findIndex(h=>/hist|descri|lan[cç]amento/.test(h));
+    idxValor = headerCandidates.findIndex(h=>/valor/.test(h));
+    idxSaldo = headerCandidates.findIndex(h=>/saldo/.test(h));
+    if(idxData<0) idxData=0;
+    if(idxDesc<0) idxDesc=1;
+    if(idxValor<0) idxValor = rows[0].length-1;
+    rows = rows.slice(1);
+  }
+
+  const parsed = [];
+  let saldoDetectado = null;
+  rows.forEach(r=>{
+    if(r.length < 2) return;
+    const date = parseDateFlexible(r[idxData]);
+    const desc = (r[idxDesc]||"").trim();
+    const val = parseBRNumber(r[idxValor]);
+    if(!date && !desc && isNaN(val)) return;
+    parsed.push({
+      id: uid(),
+      date: date || "",
+      description: desc || "(sem descrição)",
+      value: isNaN(val) ? 0 : val,
+      costCenter: "",
+      serviceOrder: "",
+      source: "csv"
+    });
+    if(idxSaldo>=0 && date){
+      const saldoLinha = parseBRNumber(r[idxSaldo]);
+      if(!isNaN(saldoLinha) && (!saldoDetectado || date>=saldoDetectado.data)){
+        saldoDetectado = {valor: saldoLinha, data: date};
+      }
+    }
+  });
+
+  if(!parsed.length){ alert("Não encontrei lançamentos reconhecíveis neste CSV. Você pode ajustar manualmente na tela de conferência."); }
+  openConferencia(parsed.length ? parsed : [{id:uid(), date:"", description:"", value:0, costCenter:"", serviceOrder:"", source:"csv"}], saldoDetectado);
+}
+
+/* ==================== IMPORTAÇÃO OFX ==================== */
+function parseOfxDate(s){
+  if(!s) return null;
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+function parseOfx(text){
+  const blocks = text.split(/<STMTTRN>/i).slice(1);
+  const results = [];
+  const getTag = (chunk, tag) => {
+    const m = chunk.match(new RegExp('<'+tag+'>\\s*([^<\\r\\n]*)', 'i'));
+    return m ? m[1].trim() : '';
+  };
+  blocks.forEach(block=>{
+    const endIdx = block.search(/<\/STMTTRN>/i);
+    const chunk = endIdx>=0 ? block.slice(0,endIdx) : block;
+    const dtposted = getTag(chunk,'DTPOSTED');
+    const trnamtRaw = getTag(chunk,'TRNAMT');
+    const memo = getTag(chunk,'MEMO') || getTag(chunk,'NAME') || '';
+    if(!dtposted && !trnamtRaw) return;
+    const date = parseOfxDate(dtposted);
+    // OFX usa ponto decimal por padrão, mas alguns bancos BR exportam com vírgula
+    let normalized = trnamtRaw.trim();
+    if(/,\d{1,2}$/.test(normalized)) normalized = normalized.replace(/\./g,"").replace(",",".");
+    const value = parseFloat(normalized);
+    results.push({
+      id: uid(),
+      date: date || "",
+      description: memo || "(sem descrição)",
+      value: isNaN(value) ? 0 : value,
+      costCenter: "",
+      serviceOrder: "",
+      source: "ofx"
+    });
+  });
+  return results;
+}
+function extrairSaldoOfx(text){
+  const idx = text.search(/<LEDGERBAL>/i);
+  if(idx<0) return null;
+  const chunk = text.slice(idx, idx+500);
+  const balMatch = chunk.match(/<BALAMT>\s*([^<\r\n]*)/i);
+  if(!balMatch) return null;
+  let normalized = balMatch[1].trim();
+  if(/,\d{1,2}$/.test(normalized)) normalized = normalized.replace(/\./g,"").replace(",",".");
+  const valor = parseFloat(normalized);
+  if(isNaN(valor)) return null;
+  const dtMatch = chunk.match(/<DTASOF>\s*([^<\r\n]*)/i);
+  const data = dtMatch ? (parseOfxDate(dtMatch[1].trim())||"") : "";
+  return {valor, data};
+}
+function handleOfxFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("ofxStatus");
+  statusEl.textContent = "Lendo OFX...";
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const parsed = parseOfx(e.target.result);
+      const saldoDetectado = extrairSaldoOfx(e.target.result);
+      statusEl.textContent = parsed.length
+        ? `Encontrei ${parsed.length} lançamento(s). Confira e ajuste abaixo.`
+        : "Não encontrei lançamentos reconhecíveis neste arquivo OFX.";
+      openConferencia(parsed.length ? parsed : [{id:uid(), date:"", description:"", value:0, costCenter:"", serviceOrder:"", source:"ofx"}], saldoDetectado);
+    }catch(err){
+      statusEl.textContent = "Erro ao ler o OFX: " + err.message;
+    }
+  };
+  reader.readAsText(file, "ISO-8859-1");
+  evt.target.value = "";
+}
+
+/* ==================== IMPORTAÇÃO PDF ==================== */
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+async function handlePdfFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("pdfStatus");
+  statusEl.textContent = "Lendo PDF...";
+  try{
+    if(!window.pdfjsLib) throw new Error("Leitor de PDF não carregou (verifique sua conexão com a internet) e tente novamente.");
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    let fullText = "";
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      let lastY = null, line = "";
+      content.items.forEach(item=>{
+        if(lastY !== null && Math.abs(item.transform[5]-lastY) > 2){
+          fullText += line + "\n";
+          line = "";
+        }
+        line += item.str + " ";
+        lastY = item.transform[5];
+      });
+      fullText += line + "\n";
+    }
+    statusEl.textContent = `PDF lido (${pdf.numPages} página[s]). Interpretando linhas...`;
+    const parsed = extractTransactionsFromText(fullText);
+    const saldoDetectado = extrairSaldoTextoExtrato(fullText);
+    statusEl.textContent = (parsed.length
+      ? `Extraí ${parsed.length} linha(s) candidatas. Confira e ajuste abaixo.`
+      : "Não consegui reconhecer linhas de lançamento automaticamente. Adicione manualmente na conferência, ou copie os dados do PDF para a aba CSV.")
+      + (saldoDetectado ? ` Saldo encontrado no texto: ${fmtBRL(saldoDetectado.valor)} — confira a data antes de confirmar.` : "");
+    openConferencia(parsed.length ? parsed : [{id:uid(), date:"", description:"", value:0, costCenter:"", serviceOrder:"", source:"pdf"}], saldoDetectado);
+  }catch(err){
+    statusEl.textContent = "Erro ao ler o PDF: " + err.message;
+  }
+}
+function extrairSaldoTextoExtrato(text){
+  const regex = /SALDO\s*(?:DO\s*DIA|ATUAL|FINAL|DISPON[IÍ]VEL)?\s*[:\-]?\s*R?\$?\s*(-?[\d\.,]+)\s*([CD])?\b/gi;
+  let match, ultimo = null;
+  while((match = regex.exec(text))){
+    let valor = parseBRNumber(match[1]);
+    if(isNaN(valor)) continue;
+    if(match[2] && match[2].toUpperCase()==="D") valor = -Math.abs(valor);
+    ultimo = valor;
+  }
+  return ultimo===null ? null : {valor: ultimo, data: ""};
+}
+
+function extractTransactionsFromText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  const results = [];
+  const dateRe = /(\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{2})/;
+  const valRe = /(-?R?\$?\s?-?\d{1,3}(?:\.\d{3})*,\d{2})\s*([DC])?/gi;
+  lines.forEach(line=>{
+    const dm = line.match(dateRe);
+    if(!dm) return;
+    const vals = [...line.matchAll(valRe)];
+    if(!vals.length) return;
+    const lastVal = vals[vals.length-1];
+    let value = parseBRNumber(lastVal[1]);
+    if(lastVal[2] && lastVal[2].toUpperCase()==="D") value = -Math.abs(value);
+    if(lastVal[2] && lastVal[2].toUpperCase()==="C") value = Math.abs(value);
+    let desc = line.replace(dateRe,"").replace(valRe,"").trim();
+    desc = desc.replace(/\s{2,}/g," ");
+    if(!desc) desc = "(descrição não identificada)";
+    results.push({
+      id: uid(),
+      date: parseDateFlexible(dm[1]) || "",
+      description: desc,
+      value: isNaN(value)?0:value,
+      costCenter: "",
+      serviceOrder: "",
+      source: "pdf"
+    });
+  });
+  return results;
+}
+
+/* ==================== TELA DE CONFERÊNCIA ==================== */
+let conferenciaBuffer = [];
+function computeSaldoAteData(dataLimite){
+  let total = state.saldoInicial || 0;
+  state.transactions.forEach(t=>{ if(!dataLimite || (t.date && t.date<=dataLimite)) total += (t.value||0); });
+  conferenciaBuffer.forEach(r=>{ if(!dataLimite || (r.date && r.date<=dataLimite)) total += (r.value||0); });
+  return total;
+}
+function atualizarConferenciaSaldo(){
+  const el = document.getElementById("conferenciaSaldoResumo");
+  if(!el) return;
+  const valorRaw = document.getElementById("saldoExtratoValor").value;
+  const data = document.getElementById("saldoExtratoData").value;
+  if(valorRaw === "" || valorRaw === null){
+    el.innerHTML = "Informe o saldo final do extrato para conferir se está batendo com o programa.";
+    return;
+  }
+  const saldoExtrato = parseFloat(valorRaw)||0;
+  const dataRef = data || (conferenciaBuffer.length ? [...conferenciaBuffer].map(r=>r.date).filter(Boolean).sort().slice(-1)[0] : "");
+  const saldoCalculado = computeSaldoAteData(dataRef);
+  const diff = saldoCalculado - saldoExtrato;
+  const bate = Math.abs(diff) < 0.01;
+  el.innerHTML = `Saldo do programa${dataRef?` até ${fmtDateBR(dataRef)}`:''} (com estes lançamentos): <b>${fmtBRL(saldoCalculado)}</b> &nbsp;|&nbsp; Saldo informado: <b>${fmtBRL(saldoExtrato)}</b> &nbsp;|&nbsp; ${bate ? '<span class="pill green">Está batendo ✓</span>' : `<span class="pill red">Diferença de ${fmtBRL(diff)}</span>`}`;
+}
+function openConferencia(rows, saldoDetectado){
+  conferenciaBuffer = rows.map(r=>{
+    if(r.classificacao === undefined || r.classificacao === null || r.classificacao === "") r.classificacao = sugerirClassificacao(r.description, r.value);
+    r.tipoCusto = derivarTipoCusto(r.classificacao, r.description);
+    if(r.classificacao === "Almoxarifado"){
+      garantirOSEstoque();
+      r.serviceOrder = r.serviceOrder || OS_ESTOQUE;
+    }
+    return r;
+  });
+  document.getElementById("conferenciaCard").style.display = "block";
+  const datasBuffer = conferenciaBuffer.map(r=>r.date).filter(Boolean).sort();
+  const dataSugerida = (saldoDetectado && saldoDetectado.data) || (datasBuffer.length ? datasBuffer[datasBuffer.length-1] : "");
+  document.getElementById("saldoExtratoValor").value = (saldoDetectado && !isNaN(saldoDetectado.valor)) ? saldoDetectado.valor : "";
+  document.getElementById("saldoExtratoData").value = dataSugerida || "";
+  renderConferencia();
+  atualizarConferenciaSaldo();
+  irParaAba("conferencias");
+}
+function renderConferencia(){
+  fillCCSelects();
+  fillOSSelects();
+  const tbody = document.getElementById("tblConferencia");
+  tbody.innerHTML = "";
+  conferenciaBuffer.forEach((row,i)=>{
+    const tr = document.createElement("tr");
+    const osObrigatoria = row.classificacao === "Despesas Operacionais";
+    const problem = !row.date || !row.description || (osObrigatoria && !row.serviceOrder);
+    if(problem) tr.style.background = "#fff6e6";
+
+    const classifSelect = `<select onchange="confUpdate(${i},'classificacao',this.value)">
+        <option value="" ${!row.classificacao?'selected':''}>— selecione —</option>
+        ${CLASSIFICACOES.map(c=>`<option value="${c}" ${row.classificacao===c?'selected':''}>${c}</option>`).join("")}
+      </select>${row.tipoCusto ? `<br><span class="badge-source">${row.tipoCusto}</span>` : ""}`;
+
+    let osCell;
+    if(row.classificacao === "Almoxarifado"){
+      osCell = `<span class="note">Estoque (fixo)</span>`;
+    } else if(row.classificacao === "Serviço Terceirizado"){
+      osCell = row.ratearOS
+        ? `<span class="note">Rateado entre OS (ver abaixo)</span><br><button class="btn secondary small" onclick="toggleRateio(${i})">Usar 1 OS só</button>`
+        : `<select class="os-select-target" onchange="confUpdate(${i},'serviceOrder',this.value)"><option value="" ${!row.serviceOrder?'selected':''}>— sem OS —</option>${state.serviceOrders.map(o=>`<option value="${o}" ${row.serviceOrder===o?'selected':''}>${o}</option>`).join("")}</select>
+           <br><button class="btn secondary small" onclick="toggleRateio(${i})">Ratear entre várias OS</button>`;
+    } else {
+      osCell = `<select class="os-select-target" onchange="confUpdate(${i},'serviceOrder',this.value)"${osObrigatoria && !row.serviceOrder ? ' style="border-color:#d33"' : ''}><option value="" ${!row.serviceOrder?'selected':''}>— sem OS —</option>${state.serviceOrders.map(o=>`<option value="${o}" ${row.serviceOrder===o?'selected':''}>${o}</option>`).join("")}</select>${osObrigatoria?'<div class="note" style="color:#d33">Obrigatória p/ Desp. Operacionais</div>':''}`;
+    }
+
+    let detalhesCell = `<span class="note">—</span>`;
+    if(row.classificacao === "Patrimônio/Investimento"){
+      const cats = ["Veículos","Máquinas e Equipamentos","Mobiliário e Utensílios","Equipamentos de Informática","Imóveis","Outros"];
+      detalhesCell = `
+        <select onchange="confUpdate(${i},'ativoCategoria',this.value)">
+          <option value="">Categoria do bem...</option>
+          ${cats.map(c=>`<option ${row.ativoCategoria===c?'selected':''}>${c}</option>`).join("")}
+        </select>
+        <input type="number" step="1" min="1" placeholder="Vida útil (anos)" value="${row.ativoVidaUtil||''}" style="width:100%;margin-top:4px;" onchange="confUpdate(${i},'ativoVidaUtil',this.value)">
+        <div class="note">Gera item de patrimônio automaticamente ao confirmar.</div>`;
+    }
+
+    tr.innerHTML = `
+      <td><input type="date" value="${row.date||''}" onchange="confUpdate(${i},'date',this.value)"></td>
+      <td><input type="text" value="${(row.description||'').replace(/"/g,'&quot;')}" onchange="confUpdate(${i},'description',this.value)"></td>
+      <td><input type="number" step="0.01" value="${Math.abs(row.value)||0}" onchange="confUpdate(${i},'absValue',this.value)"></td>
+      <td>
+        <select onchange="confUpdate(${i},'sign',this.value)">
+          <option value="despesa" ${row.value<=0?'selected':''}>Despesa</option>
+          <option value="receita" ${row.value>0?'selected':''}>Receita</option>
+        </select>
+      </td>
+      <td>${classifSelect}</td>
+      <td>${osCell}</td>
+      <td><select class="cc-select-target" onchange="confUpdate(${i},'costCenter',this.value)">${state.costCenters.map(c=>`<option value="${c}" ${row.costCenter===c?'selected':''}>${c}</option>`).join("")}<option value="" ${!row.costCenter?'selected':''}>—</option></select></td>
+      <td>${detalhesCell}</td>
+      <td><span class="tag-remove" onclick="confRemove(${i})">✕</span></td>
+    `;
+    tbody.appendChild(tr);
+
+    if(row.classificacao === "Serviço Terceirizado" && row.ratearOS && row.rateio){
+      const trRateio = document.createElement("tr");
+      trRateio.innerHTML = `<td colspan="9" style="background:#f7f8fb;">
+        <div style="padding:8px;">
+          <b>Rateio por OS</b>
+          <table style="margin-top:6px;">
+            <tbody>
+              ${row.rateio.map((p,j)=>`
+                <tr>
+                  <td><select onchange="rateioUpdate(${i},${j},'serviceOrder',this.value)"><option value="">— OS —</option>${state.serviceOrders.map(o=>`<option value="${o}" ${p.serviceOrder===o?'selected':''}>${o}</option>`).join("")}</select></td>
+                  <td><input type="number" step="0.01" value="${p.valor}" onchange="rateioUpdate(${i},${j},'valor',this.value)" style="width:120px;"></td>
+                  <td><span class="tag-remove" onclick="removeRateioLinha(${i},${j})">✕</span></td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+          <button class="btn secondary small" style="margin-top:6px;" onclick="addRateioLinha(${i})">+ OS</button>
+          <div class="note" id="rateioResumo${i}" style="margin-top:6px;"></div>
+        </div>
+      </td>`;
+      tbody.appendChild(trRateio);
+      atualizarResumoRateio(i);
+    }
+  });
+  atualizarConferenciaSaldo();
+}
+function confUpdate(i, field, value){
+  const row = conferenciaBuffer[i];
+  if(field === "absValue"){
+    const sign = row.value <= 0 ? -1 : 1;
+    row.value = sign * Math.abs(parseFloat(value)||0);
+    if(row.ratearOS) renderConferencia();
+  } else if(field === "sign"){
+    row.value = (value === "despesa" ? -1 : 1) * Math.abs(row.value);
+  } else if(field === "classificacao"){
+    row.classificacao = value;
+    row.tipoCusto = derivarTipoCusto(value, row.description);
+    if(value === "Almoxarifado"){
+      garantirOSEstoque();
+      row.serviceOrder = OS_ESTOQUE;
+      row.ratearOS = false; row.rateio = null;
+    } else if(value !== "Serviço Terceirizado"){
+      row.ratearOS = false; row.rateio = null;
+    }
+    renderConferencia();
+  } else if(field === "ativoCategoria" || field === "ativoVidaUtil"){
+    row[field] = field === "ativoVidaUtil" ? (parseFloat(value)||null) : value;
+  } else {
+    row[field] = value;
+  }
+  atualizarConferenciaSaldo();
+}
+function toggleRateio(i){
+  const row = conferenciaBuffer[i];
+  row.ratearOS = !row.ratearOS;
+  if(row.ratearOS && (!row.rateio || !row.rateio.length)){
+    row.rateio = [{serviceOrder:"", valor: Math.abs(row.value)||0}];
+  }
+  renderConferencia();
+}
+function addRateioLinha(i){
+  conferenciaBuffer[i].rateio.push({serviceOrder:"", valor:0});
+  renderConferencia();
+}
+function removeRateioLinha(i,j){
+  conferenciaBuffer[i].rateio.splice(j,1);
+  renderConferencia();
+}
+function rateioUpdate(i,j,field,value){
+  const item = conferenciaBuffer[i].rateio[j];
+  item[field] = field === "valor" ? (parseFloat(value)||0) : value;
+  atualizarResumoRateio(i);
+}
+function atualizarResumoRateio(i){
+  const row = conferenciaBuffer[i];
+  const el = document.getElementById(`rateioResumo${i}`);
+  if(!el || !row.rateio) return;
+  const soma = row.rateio.reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
+  const total = Math.abs(row.value)||0;
+  const ok = Math.abs(soma-total) < 0.01;
+  el.innerHTML = `Soma do rateio: <b>${fmtBRL(soma)}</b> / Total do lançamento: <b>${fmtBRL(total)}</b> ${ok?'<span class="pill green">OK</span>':'<span class="pill red">Não bate</span>'}`;
+}
+function confRemove(i){ conferenciaBuffer.splice(i,1); renderConferencia(); }
+function addManualRow(){
+  conferenciaBuffer.push({id:uid(), date:"", description:"", value:0, costCenter:"", serviceOrder:"", classificacao:"", tipoCusto:"", source:"manual"});
+  renderConferencia();
+}
+function cancelarConferencia(){
+  conferenciaBuffer = [];
+  document.getElementById("conferenciaCard").style.display = "none";
+  renderConferenciasPendentes();
+}
+function confirmarLancamentos(){
+  let saldoMismatchInfo = null;
+  const saldoValorRaw = document.getElementById("saldoExtratoValor").value;
+  if(saldoValorRaw !== ""){
+    const saldoExtrato = parseFloat(saldoValorRaw)||0;
+    const dataRef = document.getElementById("saldoExtratoData").value || (conferenciaBuffer.map(r=>r.date).filter(Boolean).sort().slice(-1)[0]||"");
+    const diff = computeSaldoAteData(dataRef) - saldoExtrato;
+    if(Math.abs(diff) >= 0.01){
+      if(!confirm(`O saldo do programa não está batendo com o saldo informado do extrato (diferença de ${fmtBRL(diff)}). Confirmar os lançamentos mesmo assim?`)) return;
+      saldoMismatchInfo = {data: dataRef, diferenca: diff};
+    }
+  }
+  const semDataDesc = conferenciaBuffer.filter(r=>!r.date || !r.description);
+  const semOSObrigatoria = conferenciaBuffer.filter(r=>r.classificacao==="Despesas Operacionais" && !r.serviceOrder);
+  const rateiosComOSFaltando = conferenciaBuffer.filter(r=>r.classificacao==="Serviço Terceirizado" && r.ratearOS && (!r.rateio || !r.rateio.length || r.rateio.some(x=>!x.serviceOrder)));
+  if(rateiosComOSFaltando.length){
+    alert(`${rateiosComOSFaltando.length} linha(s) de rateio por OS (Serviço Terceirizado) têm alguma OS não selecionada. Corrija antes de confirmar.`);
+    return;
+  }
+  const rateiosInvalidos = conferenciaBuffer.filter(r=>r.classificacao==="Serviço Terceirizado" && r.ratearOS && r.rateio &&
+    Math.abs(r.rateio.reduce((s,x)=>s+(parseFloat(x.valor)||0),0) - Math.abs(r.value)) > 0.01);
+  if(rateiosInvalidos.length){
+    alert(`${rateiosInvalidos.length} linha(s) de rateio por OS têm soma diferente do valor do lançamento. Corrija antes de confirmar.`);
+    return;
+  }
+  if(semDataDesc.length || semOSObrigatoria.length){
+    let msg = "";
+    if(semDataDesc.length) msg += `${semDataDesc.length} linha(s) sem data ou descrição. `;
+    if(semOSObrigatoria.length) msg += `${semOSObrigatoria.length} linha(s) de Despesas Operacionais sem OS selecionada. `;
+    if(!confirm(msg + "Lançar mesmo assim? Elas ficarão marcadas para revisão.")) return;
+  }
+  let novosAtivos = 0;
+  conferenciaBuffer.forEach(r=>{
+    const motivos = [];
+    if(!r.date || !r.description) motivos.push("Sem data ou descrição");
+    if(r.classificacao==="Despesas Operacionais" && !r.serviceOrder) motivos.push("Sem OS obrigatória (Despesas Operacionais)");
+    if(saldoMismatchInfo) motivos.push(`Saldo do extrato não batia neste lote (diferença de ${fmtBRL(saldoMismatchInfo.diferenca)})`);
+    const revisar = motivos.length>0;
+    const revisarMotivo = motivos.join(" — ");
+    if(r.classificacao === "Serviço Terceirizado" && r.ratearOS && r.rateio && r.rateio.length){
+      const sinal = r.value<=0 ? -1 : 1;
+      r.rateio.forEach(parte=>{
+        state.transactions.push({
+          id: uid(), date: r.date, description: `${r.description} (OS ${parte.serviceOrder||'—'})`,
+          value: sinal*Math.abs(parseFloat(parte.valor)||0),
+          costCenter: r.costCenter||"", serviceOrder: parte.serviceOrder||"",
+          classificacao: r.classificacao, tipoCusto: r.tipoCusto,
+          source: r.source, note: "", attachment: null,
+          revisar, revisarMotivo
+        });
+      });
+    } else {
+      const tx = {
+        id: r.id||uid(), date: r.date, description: r.description,
+        value: r.value, costCenter: r.costCenter||"", serviceOrder: r.serviceOrder||"",
+        classificacao: r.classificacao||"", tipoCusto: r.tipoCusto||"",
+        source: r.source, note: "", attachment: null,
+        revisar, revisarMotivo
+      };
+      state.transactions.push(tx);
+      if(r.classificacao === "Patrimônio/Investimento"){
+        const codigo = proximoCodigoPatrimonio();
+        state.assets.push({
+          id: uid(), descricao: r.description, categoria: r.ativoCategoria || categoriaPorPalavraChave(r.description),
+          dataAquisicao: r.date, valorAquisicao: Math.abs(r.value),
+          vidaUtilAnos: r.ativoVidaUtil || null, valorResidual: 0,
+          costCenter: r.costCenter||"", serviceOrder: r.serviceOrder||"",
+          fornecedor: "", numeroNF: "",
+          attachment: null, status: "ativo", dataBaixa: "", valorBaixa: 0,
+          linkedTxId: tx.id, linkedBaixaTxId: null,
+          codigoPatrimonio: codigo, importKey: null,
+          note: "Gerado a partir do lançamento no financeiro."
+        });
+        novosAtivos++;
+      }
+    }
+  });
+  saveState();
+  toast(`${conferenciaBuffer.length} linha(s) de lançamento confirmadas.${novosAtivos?` ${novosAtivos} item(ns) de patrimônio criado(s) automaticamente (código gerado).`:''}`);
+  cancelarConferencia();
+  document.getElementById("csvText").value = "";
+  renderAll();
+}
+
+/* ==================== LANÇAMENTOS ==================== */
+function fillMesSelect(){
+  const sel = document.getElementById("mesSelect");
+  const months = allMonthsSorted();
+  const cur = sel.value;
+  if(!months.length){
+    const nowKey = new Date().toISOString().slice(0,7);
+    sel.innerHTML = `<option value="${nowKey}">${monthLabel(nowKey)}</option>`;
+    return;
+  }
+  sel.innerHTML = months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+  if(months.includes(cur)) sel.value = cur; else sel.value = months[months.length-1];
+}
+function renderLancamentos(){
+  fillMesSelect();
+  fillCCSelects();
+  renderOS();
+  const mes = document.getElementById("mesSelect").value;
+  const tbody = document.getElementById("tblLancamentos");
+  tbody.innerHTML = "";
+  const items = state.transactions.filter(t=>monthKey(t.date)===mes).sort((a,b)=>a.date.localeCompare(b.date));
+  let receitas=0, despesas=0;
+  items.forEach(t=>{
+    if(t.value>=0) receitas+=t.value; else despesas+=Math.abs(t.value);
+    const tr = document.createElement("tr");
+    const anexoCell = t.attachment
+      ? `<span class="pill green">Anexado</span><span class="fname" title="${(t.attachment.name||'').replace(/"/g,'&quot;')}">${t.attachment.name||''}</span>
+         <button class="btn secondary small" onclick="viewAttachment('${t.id}')">Ver</button>
+         <span class="tag-remove" title="Remover anexo" onclick="removeAttachment('${t.id}')">✕</span>`
+      : `<span class="pill red">Sem anexo</span>
+         <button class="btn secondary small" onclick="pickAttachment('${t.id}')">Anexar</button>`;
+    const acoesCell = (!t.attachment ? `<button class="btn secondary small" onclick="generateRecibo('${t.id}')">Gerar recibo</button>` : "")
+      + `<span class="tag-remove" title="Excluir lançamento" onclick="deleteTx('${t.id}')">✕</span>`;
+    tr.innerHTML = `
+      <td>${t.date ? t.date.split('-').reverse().join('/') : '<em>—</em>'}</td>
+      <td>${t.description}<br><span class="badge-source">${t.source||'manual'}</span></td>
+      <td>
+        <select class="os-select-target" onchange="updateTxOS('${t.id}', this.value)">
+          <option value="" ${!t.serviceOrder?'selected':''}>— sem OS —</option>
+          ${state.serviceOrders.map(o=>`<option value="${o}" ${t.serviceOrder===o?'selected':''}>${o}</option>`).join("")}
+        </select>
+      </td>
+      <td>
+        <select class="cc-select-target" onchange="updateTxCC('${t.id}', this.value)">
+          ${state.costCenters.map(c=>`<option value="${c}" ${t.costCenter===c?'selected':''}>${c}</option>`).join("")}
+          <option value="" ${!t.costCenter?'selected':''}>—</option>
+        </select>
+      </td>
+      <td>
+        <select onchange="updateTxClassificacao('${t.id}', this.value)">
+          <option value="" ${!t.classificacao?'selected':''}>— selecione —</option>
+          ${CLASSIFICACOES.map(c=>`<option value="${c}" ${t.classificacao===c?'selected':''}>${c}</option>`).join("")}
+        </select>
+        ${t.tipoCusto ? `<br><span class="badge-source">${t.tipoCusto}</span>` : ""}
+      </td>
+      <td class="${t.value>=0?'val-pos':'val-neg'}">${fmtBRL(t.value)}</td>
+      <td><div class="anexo-cell">${anexoCell}</div></td>
+      <td><div class="acoes-cell">${acoesCell}</div></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if(!items.length) tbody.innerHTML = `<tr><td colspan="8" class="empty">Nenhum lançamento neste mês.</td></tr>`;
+  document.getElementById("resumoMes").innerHTML =
+    `Receitas: <b class="val-pos">${fmtBRL(receitas)}</b> &nbsp;|&nbsp; Despesas: <b class="val-neg">${fmtBRL(despesas)}</b> &nbsp;|&nbsp; Saldo do mês: <b>${fmtBRL(receitas-despesas)}</b>`;
+}
+function updateTxCC(id, cc){
+  const t = state.transactions.find(t=>t.id===id);
+  if(t){ t.costCenter = cc; saveState(); renderPainel(); }
+}
+function updateTxClassificacao(id, value){
+  const t = state.transactions.find(t=>t.id===id);
+  if(!t) return;
+  t.classificacao = value;
+  t.tipoCusto = derivarTipoCusto(value, t.description);
+  if(value === "Almoxarifado"){
+    garantirOSEstoque();
+    t.serviceOrder = OS_ESTOQUE;
+  }
+  saveState();
+  renderLancamentos();
+  renderPainel();
+}
+function deleteTx(id){
+  if(!confirm("Remover este lançamento?")) return;
+  state.transactions = state.transactions.filter(t=>t.id!==id);
+  saveState(); renderAll();
+}
+
+/* ==================== ANEXOS ==================== */
+function pickAttachment(id){
+  pendingAttachId = id;
+  const input = document.getElementById("attachInput");
+  input.value = "";
+  input.click();
+}
+async function handleAttachmentSelected(evt){
+  const file = evt.target.files[0];
+  if(!file || !pendingAttachId) return;
+  const temPastaVinculada = anexosDirHandle && anexosDirStatus === "ok";
+  if(file.size > 3*1024*1024 && !temPastaVinculada){
+    if(!confirm(`O arquivo tem ${(file.size/1024/1024).toFixed(1)} MB. Sem pasta vinculada, ele é embutido no backup (.json), deixando-o bem maior. Continuar?`)){
+      pendingAttachId = null;
+      evt.target.value = "";
+      return;
+    }
+  }
+  const t = state.transactions.find(x=>x.id===pendingAttachId);
+  if(!t){ pendingAttachId = null; return; }
+  const attachment = await construirAnexo(file, t.description, t.date);
+  t.attachment = attachment;
+  saveState();
+  toast(attachment && attachment.storage==="folder" ? "Anexo salvo na pasta vinculada." : "Anexo adicionado.");
+  renderLancamentos();
+  pendingAttachId = null;
+  evt.target.value = "";
+}
+function viewAttachment(id){
+  const t = state.transactions.find(x=>x.id===id);
+  if(t) abrirAnexo(t.attachment);
+}
+function removeAttachment(id){
+  if(!confirm("Remover o anexo deste lançamento?")) return;
+  const t = state.transactions.find(x=>x.id===id);
+  if(t){ t.attachment = null; saveState(); renderLancamentos(); }
+}
+
+/* ==================== RECIBO ==================== */
+function escapeHtml(s){
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+function buildReciboHtml(t){
+  const tipo = t.value>=0 ? "Receita" : "Despesa";
+  const dataFmt = t.date ? t.date.split('-').reverse().join('/') : "—";
+  const agora = new Date().toLocaleString('pt-BR');
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#1f2430;max-width:640px;margin:40px auto;padding:0 20px;}
+  h1{font-size:19px;border-bottom:2px solid #2f5233;padding-bottom:10px;}
+  .campo{margin:14px 0;font-size:14px;}
+  .campo b{display:inline-block;width:160px;color:#555;}
+  .valor{font-size:24px;font-weight:700;margin:22px 0;}
+  .obs{font-size:12px;color:#777;margin-top:10px;}
+  .assinatura{margin-top:70px;border-top:1px solid #999;width:280px;text-align:center;padding-top:6px;font-size:12px;color:#555;}
+  .rodape{margin-top:40px;font-size:11px;color:#888;}
+  @media print{ .no-print{display:none;} }
+</style></head><body>
+  <h1>RECIBO — Wolf Engenharia e Consultoria Ltda.</h1>
+  <div class="campo"><b>Data do movimento:</b> ${dataFmt}</div>
+  <div class="campo"><b>Descrição:</b> ${escapeHtml(t.description)}</div>
+  <div class="campo"><b>Tipo:</b> ${tipo}</div>
+  <div class="campo"><b>Centro de custo:</b> ${escapeHtml(t.costCenter) || "—"}</div>
+  <div class="campo"><b>Ordem de serviço:</b> ${escapeHtml(t.serviceOrder) || "—"}</div>
+  <div class="valor">${fmtBRL(Math.abs(t.value))}</div>
+  <div class="obs">Recibo gerado internamente para fins de controle financeiro, na ausência de comprovante físico ou anexo digital correspondente a este lançamento.</div>
+  <div class="assinatura">Responsável</div>
+  <div class="rodape">Documento gerado em ${agora} pelo sistema Wolf Financeiro.</div>
+  <div class="no-print" style="margin-top:30px;"><button onclick="window.print()" style="padding:8px 14px;cursor:pointer;">Imprimir / Salvar como PDF</button></div>
+</body></html>`;
+}
+function generateRecibo(id){
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  const blob = new Blob([buildReciboHtml(t)], {type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+}
+
+function addManualLancamento(){
+  const date = document.getElementById("manData").value;
+  const desc = document.getElementById("manDesc").value.trim();
+  const tipo = document.getElementById("manTipo").value;
+  const valorAbs = parseFloat(document.getElementById("manValor").value);
+  const cc = document.getElementById("manCC").value;
+  const os = document.getElementById("manOS").value;
+  if(!date || !desc || isNaN(valorAbs)){ alert("Preencha data, descrição e valor."); return; }
+  state.transactions.push({
+    id: uid(), date, description: desc,
+    value: tipo==="despesa" ? -Math.abs(valorAbs) : Math.abs(valorAbs),
+    costCenter: cc, serviceOrder: os, source: "manual", note: "", attachment: null
+  });
+  saveState();
+  document.getElementById("manDesc").value = "";
+  document.getElementById("manValor").value = "";
+  renderAll();
+  toast("Lançamento adicionado.");
+}
+
+/* ==================== BALANCETE ==================== */
+function fillAnoSelect(){
+  const sel = document.getElementById("anoSelect");
+  const years = allYearsSorted();
+  const cur = sel.value;
+  sel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join("");
+  if(years.includes(cur)) sel.value = cur; else sel.value = years[years.length-1];
+}
+function renderBalancete(){
+  fillAnoSelect();
+  const ano = document.getElementById("anoSelect").value;
+  const meses = Array.from({length:12}, (_,i)=>`${ano}-${String(i+1).padStart(2,'0')}`);
+  const table = document.getElementById("tblBalancete");
+
+  let head = `<thead><tr><th>Centro de custo</th>${meses.map(m=>`<th>${monthLabel(m)}</th>`).join("")}<th>Total</th></tr></thead>`;
+  let body = "<tbody>";
+  const totalPorMes = {}; meses.forEach(m=>totalPorMes[m]=0);
+  let totalGeral = 0;
+
+  state.costCenters.concat([""]).forEach(cc=>{
+    const label = cc || "Sem classificação";
+    let rowTotal = 0;
+    const cells = meses.map(m=>{
+      const val = state.transactions
+        .filter(t=>t.costCenter===cc && monthKey(t.date)===m && t.value<0)
+        .reduce((s,t)=>s+Math.abs(t.value),0);
+      totalPorMes[m]+=val; rowTotal+=val; totalGeral+=val;
+      return `<td>${val ? fmtBRL(val) : '—'}</td>`;
+    }).join("");
+    if(rowTotal>0 || cc==="") body += `<tr><td>${label}</td>${cells}<td><b>${fmtBRL(rowTotal)}</b></td></tr>`;
+  });
+
+  // linha de receitas
+  let receitaRowTotal = 0;
+  const receitaCells = meses.map(m=>{
+    const val = state.transactions.filter(t=>monthKey(t.date)===m && t.value>=0).reduce((s,t)=>s+t.value,0);
+    receitaRowTotal += val;
+    return `<td class="val-pos">${val?fmtBRL(val):'—'}</td>`;
+  }).join("");
+  body += `<tr style="background:#f6faf7"><td><b>Receitas (total)</b></td>${receitaCells}<td class="val-pos"><b>${fmtBRL(receitaRowTotal)}</b></td></tr>`;
+
+  const despesaCells = meses.map(m=>`<td class="val-neg">${totalPorMes[m]?fmtBRL(totalPorMes[m]):'—'}</td>`).join("");
+  body += `<tr style="background:#faf6f6"><td><b>Despesas (total)</b></td>${despesaCells}<td class="val-neg"><b>${fmtBRL(totalGeral)}</b></td></tr>`;
+
+  const saldoCells = meses.map(m=>{
+    const rec = state.transactions.filter(t=>monthKey(t.date)===m && t.value>=0).reduce((s,t)=>s+t.value,0);
+    const desp = totalPorMes[m];
+    return `<td><b>${fmtBRL(rec-desp)}</b></td>`;
+  }).join("");
+  body += `<tr style="background:#f0f1f4"><td><b>Saldo do mês</b></td>${saldoCells}<td><b>${fmtBRL(receitaRowTotal-totalGeral)}</b></td></tr>`;
+
+  body += "</tbody>";
+  table.innerHTML = head+body;
+
+  renderPatrimonioResumo();
+  renderEstoqueResumo();
+}
+
+/* ==================== PAINEL ==================== */
+function fillPainelMesSelect(){
+  const sel = document.getElementById("painelMes");
+  const nowKey = new Date().toISOString().slice(0,7);
+  const opcoes = [...new Set([...allMonthsSorted(), nowKey])].sort();
+  const atual = sel.value || nowKey;
+  sel.innerHTML = opcoes.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+  sel.value = opcoes.includes(atual) ? atual : opcoes[opcoes.length-1];
+}
+function renderPainel(){
+  document.getElementById("saldoInicial").value = state.saldoInicial || "";
+  document.getElementById("metaFaturamento").value = state.metaFaturamentoMensal || 0;
+  fillPainelMesSelect();
+  const mes = document.getElementById("painelMes").value;
+  const fimMes = ultimoDiaMes(mes);
+  const nowKey = new Date().toISOString().slice(0,7);
+  const months = [...new Set([...allMonthsSorted(), nowKey])].sort();
+
+  const saldoAcumulado = computeSaldoAteData(fimMes);
+
+  const txMes = state.transactions.filter(t=>monthKey(t.date)===mes);
+  const receitasMes = txMes.filter(t=>t.value>=0).reduce((s,t)=>s+t.value,0);
+  const despesasMes = txMes.filter(t=>t.value<0).reduce((s,t)=>s+Math.abs(t.value),0);
+
+  const receberMes = state.receivables.filter(r=>r.status==='pendente' && monthKey(r.vencimento)===mes);
+  const aReceberMesPendente = receberMes.reduce((s,r)=>s+r.valor,0);
+
+  const pagarMes = state.payables.filter(p=>monthKey(p.vencimento)===mes);
+  const aPagarMesPendente = pagarMes.filter(p=>p.status==='pendente').reduce((s,p)=>s+p.valor,0);
+  const aPagarMesPago = pagarMes.filter(p=>p.status==='pago').reduce((s,p)=>s+p.valor,0);
+
+  const kpis = [
+    {label:`Saldo acumulado até ${monthLabel(mes)}`, value: fmtBRL(saldoAcumulado), cls: saldoAcumulado>=0?'pos':'neg'},
+    {label:`Receitas — ${monthLabel(mes)}`, value: fmtBRL(receitasMes), cls:'pos'},
+    {label:`Despesas — ${monthLabel(mes)}`, value: fmtBRL(despesasMes), cls:'neg'},
+    {label:`Resultado — ${monthLabel(mes)}`, value: fmtBRL(receitasMes-despesasMes), cls:(receitasMes-despesasMes)>=0?'pos':'neg'},
+    {label:`Boletos/NF a receber no mês (pendente)`, value: fmtBRL(aReceberMesPendente), cls:'pos'},
+    {label:`Contas a pagar no mês (pendente)`, value: fmtBRL(aPagarMesPendente), cls:'neg'},
+  ];
+  document.getElementById("kpiGrid").innerHTML = kpis.map(k=>`
+    <div class="kpi"><div class="label">${k.label}</div><div class="value ${k.cls}">${k.value}</div></div>
+  `).join("");
+
+  // Meta de faturamento mensal (faturado = boletos/NF emitidos no mês, independente de recebido)
+  const faturadoMes = state.receivables.filter(r=>r.status!=='cancelado' && monthKey(r.dataEmissao)===mes).reduce((s,r)=>s+r.valor,0);
+  const meta = state.metaFaturamentoMensal || 0;
+  const pctMeta = meta>0 ? (faturadoMes/meta)*100 : 0;
+  const barFill = document.getElementById("faturamentoBarFill");
+  barFill.style.width = Math.min(Math.max(pctMeta,0),100) + "%";
+  barFill.classList.toggle("atingida", pctMeta>=100);
+  const faltaMeta = meta - faturadoMes;
+  document.getElementById("faturamentoResumo").innerHTML =
+    `Faturado em ${monthLabel(mes)}: <b class="val-pos">${fmtBRL(faturadoMes)}</b> &nbsp;|&nbsp; Meta: <b>${fmtBRL(meta)}</b> &nbsp;|&nbsp; <b>${pctMeta.toFixed(1)}%</b> da meta `
+    + (faltaMeta>0 ? `&nbsp;|&nbsp; Faltam <b class="val-neg">${fmtBRL(faltaMeta)}</b> para bater a meta` : `&nbsp;|&nbsp; <span class="pill green">Meta batida! 🎉 (${fmtBRL(-faltaMeta)} acima)</span>`);
+
+  // Boletos/NF a receber no mês selecionado (lista)
+  document.getElementById("tblReceberMes").innerHTML = receberMes.length ? receberMes.sort((a,b)=>(a.vencimento||"").localeCompare(b.vencimento||"")).map(r=>`
+    <tr><td>${fmtDateBR(r.vencimento)}</td><td>${escapeHtml(r.cliente||"")}</td><td>${escapeHtml(r.tipo||"")}${r.numero?' nº '+escapeHtml(r.numero):''}</td><td class="val-pos">${fmtBRL(r.valor)}</td></tr>
+  `).join("") : `<tr><td colspan="4" class="empty">Nenhum boleto/NF pendente com vencimento neste mês.</td></tr>`;
+  document.getElementById("resumoReceberMes").innerHTML = `Total pendente no mês: <b class="val-pos">${fmtBRL(aReceberMesPendente)}</b>`;
+
+  // Contas a pagar no mês selecionado (lista, pendentes e pagas)
+  document.getElementById("tblPagarMes").innerHTML = pagarMes.length ? pagarMes.sort((a,b)=>(a.vencimento||"").localeCompare(b.vencimento||"")).map(p=>`
+    <tr><td>${fmtDateBR(p.vencimento)}</td><td>${escapeHtml(p.descricao||"")}</td><td class="val-neg">${fmtBRL(p.valor)}</td><td>${p.status==='pago'?'<span class="pill green">Pago</span>':'<span class="pill red">Pendente</span>'}</td></tr>
+  `).join("") : `<tr><td colspan="4" class="empty">Nenhuma conta a pagar com vencimento neste mês.</td></tr>`;
+  document.getElementById("resumoPagarMes").innerHTML = `Pendente: <b class="val-neg">${fmtBRL(aPagarMesPendente)}</b> &nbsp;|&nbsp; Já pago: <b>${fmtBRL(aPagarMesPago)}</b> &nbsp;|&nbsp; Total do mês: <b>${fmtBRL(aPagarMesPendente+aPagarMesPago)}</b>`;
+
+  // despesas por centro de custo no mês atual
+  const byCC = {};
+  txMes.filter(t=>t.value<0).forEach(t=>{
+    const cc = t.costCenter || "Sem classificação";
+    byCC[cc] = (byCC[cc]||0) + Math.abs(t.value);
+  });
+  const totalCC = Object.values(byCC).reduce((a,b)=>a+b,0) || 1;
+  const rows = Object.entries(byCC).sort((a,b)=>b[1]-a[1]);
+  const tbody = document.querySelector("#tblDespesasCC tbody");
+  tbody.innerHTML = rows.length ? rows.map(([cc,val])=>`
+    <tr><td>${cc}</td><td class="val-neg">${fmtBRL(val)}</td><td>${((val/totalCC)*100).toFixed(1)}%</td></tr>
+  `).join("") : `<tr><td colspan="3" class="empty">Sem despesas classificadas neste mês.</td></tr>`;
+
+  // Custo Fixo x Variável (por Classificação) no mês atual
+  const porTipo = {Fixo:0, "Variável":0, Investimento:0, Resultado:0};
+  const porClassif = {};
+  txMes.filter(t=>t.value<0).forEach(t=>{
+    const classif = t.classificacao || "Sem classificação";
+    porClassif[classif] = (porClassif[classif]||0) + Math.abs(t.value);
+    const tipo = t.tipoCusto;
+    if(tipo && porTipo.hasOwnProperty(tipo)) porTipo[tipo] += Math.abs(t.value);
+  });
+  const totalClassif = Object.values(porClassif).reduce((a,b)=>a+b,0) || 1;
+  const linhasClassif = Object.entries(porClassif).sort((a,b)=>b[1]-a[1]);
+  const tbodyTipo = document.querySelector("#tblTipoCusto tbody");
+  tbodyTipo.innerHTML = linhasClassif.length ? linhasClassif.map(([c,val])=>`
+    <tr><td>${c}</td><td class="val-neg">${fmtBRL(val)}</td><td>${((val/totalClassif)*100).toFixed(1)}%</td></tr>
+  `).join("") : `<tr><td colspan="3" class="empty">Sem despesas classificadas neste mês.</td></tr>`;
+  document.getElementById("resumoTipoCusto").innerHTML =
+    `Custo Fixo: <b class="val-neg">${fmtBRL(porTipo.Fixo)}</b> &nbsp;|&nbsp; Custo Variável: <b class="val-neg">${fmtBRL(porTipo["Variável"])}</b> &nbsp;|&nbsp; Investimento: <b>${fmtBRL(porTipo.Investimento)}</b> &nbsp;|&nbsp; Resultado (lucros): <b>${fmtBRL(porTipo.Resultado)}</b>`;
+
+  // próximos vencimentos (receber + pagar), pendentes, até 15 dias ou já vencidos
+  const limite = new Date(); limite.setDate(limite.getDate()+15);
+  const limiteStr = limite.toISOString().slice(0,10);
+  const vencRec = state.receivables.filter(r=>r.status==='pendente' && r.vencimento && r.vencimento<=limiteStr)
+    .map(r=>({data:r.vencimento, tipo:'A receber', desc:`${r.cliente} (${r.tipo}${r.numero?' nº '+r.numero:''})`, valor:r.valor, vencido:r.vencimento<todayStr()}));
+  const vencPag = state.payables.filter(p=>p.status==='pendente' && p.vencimento && p.vencimento<=limiteStr)
+    .map(p=>({data:p.vencimento, tipo:'A pagar', desc:p.descricao, valor:-p.valor, vencido:p.vencimento<todayStr()}));
+  const venc = [...vencRec, ...vencPag].sort((a,b)=>a.data.localeCompare(b.data));
+  document.getElementById("tblVencimentos").innerHTML = venc.length ? venc.map(v=>`
+    <tr>
+      <td>${fmtDateBR(v.data)}</td>
+      <td>${v.tipo}</td>
+      <td>${escapeHtml(v.desc)}</td>
+      <td class="${v.valor>=0?'val-pos':'val-neg'}">${fmtBRL(v.valor)}</td>
+      <td>${v.vencido ? '<span class="pill red">Vencido</span>' : '<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>'}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="5" class="empty">Nada vencendo nos próximos 15 dias.</td></tr>`;
+
+  // últimos lançamentos
+  const ultimos = [...state.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+  document.getElementById("tblUltimos").innerHTML = ultimos.length ? ultimos.map(t=>`
+    <tr><td>${t.date?t.date.split('-').reverse().join('/'):'—'}</td><td>${t.description}</td><td>${t.costCenter||'<em>—</em>'}</td><td class="${t.value>=0?'val-pos':'val-neg'}">${fmtBRL(t.value)}</td></tr>
+  `).join("") : `<tr><td colspan="4" class="empty">Nenhum lançamento ainda. Importe um extrato para começar.</td></tr>`;
+
+  // gráfico evolução mensal (últimos 6 meses com dados)
+  const last6 = months.slice(-6);
+  const chartArea = document.getElementById("chartArea");
+  if(!last6.length){
+    chartArea.innerHTML = `<div class="empty">Sem dados suficientes ainda.</div>`;
+  }else{
+    const data = last6.map(m=>{
+      const rec = state.transactions.filter(t=>monthKey(t.date)===m && t.value>=0).reduce((s,t)=>s+t.value,0);
+      const desp = state.transactions.filter(t=>monthKey(t.date)===m && t.value<0).reduce((s,t)=>s+Math.abs(t.value),0);
+      return {m, rec, desp};
+    });
+    const max = Math.max(...data.map(d=>Math.max(d.rec,d.desp)), 1);
+    chartArea.innerHTML = `<div class="bar-chart">` + data.map(d=>`
+      <div class="bar-col">
+        <div class="bar-wrap">
+          <div class="bar receita" style="height:${(d.rec/max*120).toFixed(0)}px" title="Receitas: ${fmtBRL(d.rec)}"></div>
+          <div class="bar despesa" style="height:${(d.desp/max*120).toFixed(0)}px" title="Despesas: ${fmtBRL(d.desp)}"></div>
+        </div>
+        <div style="margin-top:6px;color:var(--muted)">${monthLabel(d.m)}</div>
+      </div>
+    `).join("") + `</div>`;
+  }
+}
+
+/* ==================== HELPERS DE DATA ==================== */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDateBR(iso){ return iso ? iso.split('-').reverse().join('/') : '—'; }
+
+/* ==================== BOLETOS / NF — A RECEBER ==================== */
+function renderReceivables(){
+  fillOSSelects(); fillCCSelects();
+  const tbody = document.getElementById("tblReceivables");
+  const items = [...state.receivables].sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||''));
+  let totalPendente=0, totalRecebido=0, totalCancelado=0;
+  tbody.innerHTML = items.length ? items.map(r=>{
+    const vencido = r.status==='pendente' && r.vencimento && r.vencimento < todayStr();
+    const statusPill = r.status==='recebido'
+      ? `<span class="pill green">Recebido</span>`
+      : r.status==='cancelado'
+      ? `<span class="pill" style="background:#eee;color:#888">Cancelado</span>`
+      : vencido ? `<span class="pill red">Vencido</span>` : `<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>`;
+    if(r.status==='pendente') totalPendente += r.valor;
+    else if(r.status==='recebido') totalRecebido += r.valor;
+    else if(r.status==='cancelado') totalCancelado += r.valor;
+    const acoes = r.status==='pendente'
+      ? `<button class="btn secondary small" onclick="markReceived('${r.id}')">Marcar recebido</button>`
+      : '';
+    return `<tr>
+      <td>${escapeHtml(r.cliente)}</td>
+      <td>${r.tipo}${r.numero? ' nº '+escapeHtml(r.numero):''}${r.nossoNumero?`<br><span class="badge-source">Nosso Nº ${escapeHtml(r.nossoNumero)}</span>`:''}</td>
+      <td>${fmtDateBR(r.dataEmissao)}</td>
+      <td>${fmtDateBR(r.vencimento)}</td>
+      <td class="val-pos">${fmtBRL(r.valor)}</td>
+      <td>${r.serviceOrder || '—'}</td>
+      <td>${statusPill}</td>
+      <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deleteReceivable('${r.id}')">✕</span></div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">Nenhum boleto/NF registrado ainda.</td></tr>`;
+  document.getElementById("resumoReceivables").innerHTML =
+    `Pendente: <b>${fmtBRL(totalPendente)}</b> &nbsp;|&nbsp; Recebido: <b class="val-pos">${fmtBRL(totalRecebido)}</b>${totalCancelado?` &nbsp;|&nbsp; Cancelado: <b>${fmtBRL(totalCancelado)}</b>`:''}`;
+}
+function addReceivable(){
+  const cliente = document.getElementById("recCliente").value.trim();
+  const tipo = document.getElementById("recTipo").value;
+  const numero = document.getElementById("recNumero").value.trim();
+  const dataEmissao = document.getElementById("recEmissao").value;
+  const vencimento = document.getElementById("recVencimento").value;
+  const valor = parseFloat(document.getElementById("recValor").value);
+  const os = document.getElementById("recOS").value;
+  const cc = document.getElementById("recCC").value;
+  const nota = document.getElementById("recNota").value.trim();
+  if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor."); return; }
+  state.receivables.push({
+    id: uid(), cliente, tipo, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
+  });
+  saveState();
+  ["recCliente","recNumero","recValor","recNota"].forEach(id=>document.getElementById(id).value="");
+  renderReceivables();
+  toast("Título registrado.");
+}
+function markReceived(id){
+  const r = state.receivables.find(x=>x.id===id);
+  if(!r) return;
+  const dataRec = prompt("Data do recebimento (dd/mm/aaaa):", fmtDateBR(todayStr()));
+  if(dataRec===null) return;
+  const iso = parseDateFlexible(dataRec) || todayStr();
+  const tx = {
+    id: uid(), date: iso, description: `Recebimento ${r.tipo}${r.numero?(' nº '+r.numero):''} — ${r.cliente}`,
+    value: Math.abs(r.valor), costCenter: r.costCenter||"", serviceOrder: r.serviceOrder||"",
+    source:"receivable", note:"", attachment:null
+  };
+  state.transactions.push(tx);
+  r.status = "recebido"; r.dataRecebimento = iso; r.linkedTxId = tx.id;
+  saveState();
+  toast("Recebimento lançado no financeiro.");
+  renderReceivables(); renderPainel();
+}
+function deleteReceivable(id){
+  const r = state.receivables.find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm("Remover este título?")) return;
+  if(r.linkedTxId && confirm("Este título já gerou um lançamento financeiro. Remover também o lançamento?")){
+    state.transactions = state.transactions.filter(t=>t.id!==r.linkedTxId);
+  }
+  state.receivables = state.receivables.filter(x=>x.id!==id);
+  saveState();
+  renderReceivables(); renderPainel();
+}
+
+/* ==================== IMPORTAÇÃO DO RELATÓRIO DE BOLETOS (SICREDI) ==================== */
+async function handleBoletosReportFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("boletosImportStatus");
+  statusEl.textContent = "Lendo relatório...";
+  try{
+    if(!window.XLSX) throw new Error("Leitor de planilha não carregou (verifique sua conexão com a internet) e tente novamente.");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:"array"});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:"", raw:false});
+    const resultado = importarRelatorioBoletos(rows);
+    statusEl.textContent = `Relatório processado: ${resultado.novos} novo(s), ${resultado.atualizados} atualizado(s) para recebido, ${resultado.cancelados} cancelado(s), ${resultado.inalterados} já estavam em dia.`;
+    saveState();
+    renderReceivables();
+    renderPainel();
+    toast("Relatório de boletos importado.");
+  }catch(err){
+    statusEl.textContent = "Erro ao importar o relatório: " + err.message;
+  }
+  evt.target.value = "";
+}
+function importarRelatorioBoletos(rows){
+  let headerIdx = -1;
+  for(let i=0;i<rows.length;i++){
+    const line = (rows[i]||[]).map(c=>String(c||"").toLowerCase());
+    if(line.some(c=>c.includes("pagador")) && line.some(c=>c.includes("vencimento"))){
+      headerIdx = i; break;
+    }
+  }
+  if(headerIdx<0) throw new Error('Não encontrei as colunas esperadas ("Pagador", "Vencimento"...) neste arquivo.');
+  const header = rows[headerIdx].map(c=>String(c||"").trim().toLowerCase());
+  const idx = {
+    numero: header.findIndex(h=>h.includes("doc")),
+    nossoNumero: header.findIndex(h=>h.includes("nosso")),
+    pagador: header.findIndex(h=>h.includes("pagador")),
+    emissao: header.findIndex(h=>h.includes("emiss")),
+    vencimento: header.findIndex(h=>h.includes("vencimento")),
+    valor: header.findIndex(h=>h.includes("valor") && !h.includes("liquida")),
+    liquidacao: header.findIndex(h=>h.includes("liquida")),
+    situacao: header.findIndex(h=>h.includes("situa"))
+  };
+  if(idx.pagador<0 || idx.vencimento<0 || idx.valor<0){
+    throw new Error("Não encontrei todas as colunas esperadas no relatório (Pagador, Vencimento, Valor).");
+  }
+
+  let novos=0, atualizados=0, cancelados=0, inalterados=0;
+
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || !r[idx.pagador]) continue;
+    const cliente = String(r[idx.pagador]).trim();
+    if(!cliente) continue;
+    const numero = idx.numero>=0 ? String(r[idx.numero]||"").trim() : "";
+    const nossoNumero = idx.nossoNumero>=0 ? String(r[idx.nossoNumero]||"").trim() : "";
+    const dataEmissao = idx.emissao>=0 ? (parseDateFlexible(String(r[idx.emissao]||"").trim())||"") : "";
+    const vencimento = parseDateFlexible(String(r[idx.vencimento]||"").trim()) || "";
+    const valor = parseBRNumber(r[idx.valor]);
+    const liquidacaoRaw = idx.liquidacao>=0 ? parseBRNumber(r[idx.liquidacao]) : NaN;
+    const situacaoRaw = idx.situacao>=0 ? String(r[idx.situacao]||"").trim().toUpperCase() : "";
+    if(!vencimento || isNaN(valor)) continue;
+
+    let novoStatus = "pendente";
+    if(situacaoRaw.startsWith("LIQUIDADO")) novoStatus = "recebido";
+    else if(situacaoRaw.startsWith("BAIXADO")) novoStatus = "cancelado";
+    // valor efetivamente recebido: usa a coluna "Liquidação (R$)" quando disponível (pode ter juros/multa ou desconto), senão o valor de face
+    const valorRecebido = (!isNaN(liquidacaoRaw) && liquidacaoRaw>0) ? liquidacaoRaw : valor;
+
+    const existente = nossoNumero ? state.receivables.find(x=>x.nossoNumero && x.nossoNumero===nossoNumero) : null;
+
+    if(existente){
+      if(existente.status === "recebido"){
+        inalterados++;
+      } else if(novoStatus === "recebido"){
+        existente.status = "recebido";
+        existente.dataRecebimento = vencimento;
+        existente.note = (existente.note ? existente.note+" — " : "") + "Confirmado via relatório de boletos (data aproximada pelo vencimento).";
+        const tx = {
+          id: uid(), date: vencimento, description: `Recebimento Boleto nº ${numero||existente.numero} — ${cliente}`,
+          value: Math.abs(valorRecebido), costCenter: existente.costCenter||"", serviceOrder: existente.serviceOrder||"",
+          source: "receivable", note: "", attachment: null
+        };
+        state.transactions.push(tx);
+        existente.linkedTxId = tx.id;
+        atualizados++;
+      } else if(novoStatus === "cancelado" && existente.status === "pendente"){
+        existente.status = "cancelado";
+        cancelados++;
+      } else {
+        inalterados++;
+      }
+    } else {
+      const novo = {
+        id: uid(), cliente, tipo: "Boleto", numero, nossoNumero,
+        dataEmissao, vencimento, valor,
+        serviceOrder: "", costCenter: "",
+        note: "Importado do relatório de boletos (Sicredi).",
+        status: novoStatus, dataRecebimento: novoStatus==="recebido" ? vencimento : "",
+        linkedTxId: null
+      };
+      if(novoStatus === "recebido"){
+        const tx = {
+          id: uid(), date: vencimento, description: `Recebimento Boleto nº ${numero} — ${cliente}`,
+          value: Math.abs(valorRecebido), costCenter: "", serviceOrder: "",
+          source: "receivable", note: "", attachment: null
+        };
+        state.transactions.push(tx);
+        novo.linkedTxId = tx.id;
+      }
+      state.receivables.push(novo);
+      if(novoStatus === "cancelado") cancelados++; else novos++;
+    }
+  }
+  return {novos, atualizados, cancelados, inalterados};
+}
+
+/* ==================== CONTAS A PAGAR ==================== */
+function renderPayables(){
+  fillCCSelects(); fillOSSelects();
+  const tbody = document.getElementById("tblPayables");
+  const items = [...state.payables].sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||''));
+  let totalPendente=0, totalPago=0;
+  tbody.innerHTML = items.length ? items.map(p=>{
+    const vencido = p.status==='pendente' && p.vencimento && p.vencimento < todayStr();
+    const statusPill = p.status==='pago'
+      ? `<span class="pill green">Pago</span>`
+      : vencido ? `<span class="pill red">Vencido</span>` : `<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>`;
+    if(p.status==='pendente') totalPendente += p.valor; else totalPago += p.valor;
+    const acoes = p.status==='pendente'
+      ? `<button class="btn secondary small" onclick="markPaid('${p.id}')">Marcar pago</button>`
+      : '';
+    return `<tr>
+      <td>${escapeHtml(p.descricao)}</td>
+      <td>${fmtDateBR(p.vencimento)}</td>
+      <td class="val-neg">${fmtBRL(p.valor)}</td>
+      <td>${p.costCenter || '—'}</td>
+      <td>${p.serviceOrder || '—'}</td>
+      <td>${statusPill}</td>
+      <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deletePayable('${p.id}')">✕</span></div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="7" class="empty">Nenhuma conta a pagar registrada ainda.</td></tr>`;
+  document.getElementById("resumoPayables").innerHTML =
+    `Pendente: <b class="val-neg">${fmtBRL(totalPendente)}</b> &nbsp;|&nbsp; Pago: <b>${fmtBRL(totalPago)}</b>`;
+}
+function addPayable(){
+  const descricao = document.getElementById("pagDescricao").value.trim();
+  const vencimento = document.getElementById("pagVencimento").value;
+  const valor = parseFloat(document.getElementById("pagValor").value);
+  const cc = document.getElementById("pagCC").value;
+  const os = document.getElementById("pagOS").value;
+  const nota = document.getElementById("pagNota").value.trim();
+  if(!descricao || !vencimento || isNaN(valor)){ alert("Preencha ao menos descrição, vencimento e valor."); return; }
+  state.payables.push({
+    id: uid(), descricao, vencimento, valor, costCenter: cc, serviceOrder: os, note: nota,
+    status:"pendente", dataPagamento:"", linkedTxId:null
+  });
+  saveState();
+  ["pagDescricao","pagValor","pagNota"].forEach(id=>document.getElementById(id).value="");
+  renderPayables();
+  toast("Conta registrada.");
+}
+function markPaid(id){
+  const p = state.payables.find(x=>x.id===id);
+  if(!p) return;
+  const dataPag = prompt("Data do pagamento (dd/mm/aaaa):", fmtDateBR(todayStr()));
+  if(dataPag===null) return;
+  const iso = parseDateFlexible(dataPag) || todayStr();
+  const tx = {
+    id: uid(), date: iso, description: `Pagamento — ${p.descricao}`,
+    value: -Math.abs(p.valor), costCenter: p.costCenter||"", serviceOrder: p.serviceOrder||"",
+    source:"payable", note:"", attachment:null
+  };
+  state.transactions.push(tx);
+  p.status = "pago"; p.dataPagamento = iso; p.linkedTxId = tx.id;
+  saveState();
+  toast("Pagamento lançado no financeiro.");
+  renderPayables(); renderPainel();
+}
+function deletePayable(id){
+  const p = state.payables.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm("Remover esta conta?")) return;
+  if(p.linkedTxId && confirm("Esta conta já gerou um lançamento financeiro. Remover também o lançamento?")){
+    state.transactions = state.transactions.filter(t=>t.id!==p.linkedTxId);
+  }
+  state.payables = state.payables.filter(x=>x.id!==id);
+  saveState();
+  renderPayables(); renderPainel();
+}
+
+/* ==================== SÓCIOS ==================== */
+function renderPartners(){
+  const box = document.getElementById("partnersList");
+  if(!box) return;
+  box.innerHTML = state.partners.length ? "" : `<span class="note">Nenhum sócio cadastrado ainda.</span>`;
+  state.partners.forEach(p=>{
+    const chip = document.createElement("span");
+    chip.className = "cc-chip";
+    chip.innerHTML = `${p} <span class="tag-remove" onclick="removePartner('${p.replace(/'/g,"\\'")}')">✕</span>`;
+    box.appendChild(chip);
+  });
+  const sel = document.getElementById("socPartner");
+  if(sel){
+    const cur = sel.value;
+    sel.innerHTML = state.partners.map(p=>`<option value="${p}">${p}</option>`).join("");
+    if(state.partners.includes(cur)) sel.value = cur;
+  }
+}
+function addPartner(){
+  const input = document.getElementById("novoSocio");
+  const v = input.value.trim();
+  if(!v) return;
+  if(state.partners.includes(v)){ toast("Já existe."); return; }
+  state.partners.push(v);
+  input.value="";
+  saveState(); renderPartners();
+}
+function removePartner(p){
+  const inUse = state.partnerPayments.some(x=>x.partner===p);
+  if(inUse && !confirm(`"${p}" possui lançamentos registrados. Remover mesmo assim? Os lançamentos ficarão sem sócio vinculado.`)) return;
+  state.partners = state.partners.filter(x=>x!==p);
+  state.partnerPayments.forEach(x=>{ if(x.partner===p) x.partner=""; });
+  saveState(); renderPartners(); renderSocios();
+}
+function addPartnerPayment(){
+  const date = document.getElementById("socData").value;
+  const partner = document.getElementById("socPartner").value;
+  const tipo = document.getElementById("socTipo").value;
+  const valor = parseFloat(document.getElementById("socValor").value);
+  const nota = document.getElementById("socNota").value.trim();
+  if(!date || !partner || isNaN(valor)){ alert("Preencha data, sócio e valor. Cadastre um sócio primeiro, se a lista estiver vazia."); return; }
+  state.partnerPayments.push({ id: uid(), date, partner, tipo, value: Math.abs(valor), note: nota });
+  saveState();
+  document.getElementById("socValor").value=""; document.getElementById("socNota").value="";
+  renderSocios();
+  toast("Lançamento de sócio adicionado.");
+}
+function deletePartnerPayment(id){
+  if(!confirm("Remover este lançamento?")) return;
+  state.partnerPayments = state.partnerPayments.filter(x=>x.id!==id);
+  saveState(); renderSocios();
+}
+function fillAnoSelectSocios(){
+  const sel = document.getElementById("anoSelectSocios");
+  const years = new Set(state.partnerPayments.map(p=>p.date.slice(0,4)));
+  years.add(String(new Date().getFullYear()));
+  const arr = [...years].sort();
+  const cur = sel.value;
+  sel.innerHTML = arr.map(y=>`<option value="${y}">${y}</option>`).join("");
+  if(arr.includes(cur)) sel.value = cur; else sel.value = arr[arr.length-1];
+}
+function renderSocios(){
+  renderPartners();
+  fillAnoSelectSocios();
+  const ano = document.getElementById("anoSelectSocios").value;
+  const meses = Array.from({length:12}, (_,i)=>`${ano}-${String(i+1).padStart(2,'0')}`);
+  const table = document.getElementById("tblSocios");
+
+  let head = `<thead><tr><th>Sócio</th>${meses.map(m=>`<th>${monthLabel(m)}</th>`).join("")}<th>Total</th></tr></thead>`;
+  let body = "<tbody>";
+  if(!state.partners.length){
+    body += `<tr><td colspan="${meses.length+2}" class="empty">Cadastre ao menos um sócio para ver o detalhamento.</td></tr>`;
+  }
+  state.partners.forEach(partner=>{
+    ["pro-labore","distribuicao"].forEach(tipo=>{
+      const label = tipo==="pro-labore" ? `${partner} — Pró-labore` : `${partner} — Distribuição`;
+      let rowTotal = 0;
+      const cells = meses.map(m=>{
+        const val = state.partnerPayments
+          .filter(p=>p.partner===partner && p.tipo===tipo && monthKey(p.date)===m)
+          .reduce((s,p)=>s+p.value,0);
+        rowTotal += val;
+        return `<td>${val?fmtBRL(val):'—'}</td>`;
+      }).join("");
+      body += `<tr><td>${label}</td>${cells}<td><b>${fmtBRL(rowTotal)}</b></td></tr>`;
+    });
+    let partnerTotal = 0;
+    const totalCells = meses.map(m=>{
+      const val = state.partnerPayments.filter(p=>p.partner===partner && monthKey(p.date)===m).reduce((s,p)=>s+p.value,0);
+      partnerTotal += val;
+      return `<td><b>${val?fmtBRL(val):'—'}</b></td>`;
+    }).join("");
+    body += `<tr style="background:#f6f7f4"><td><b>${partner} — Total</b></td>${totalCells}<td><b>${fmtBRL(partnerTotal)}</b></td></tr>`;
+  });
+  body += "</tbody>";
+  table.innerHTML = head + body;
+
+  const tbody2 = document.getElementById("tblSociosLancamentos");
+  const items = [...state.partnerPayments].sort((a,b)=>b.date.localeCompare(a.date));
+  tbody2.innerHTML = items.length ? items.map(p=>`
+    <tr>
+      <td>${fmtDateBR(p.date)}</td>
+      <td>${escapeHtml(p.partner)||'<em>—</em>'}</td>
+      <td>${p.tipo==='pro-labore'?'Pró-labore':'Distribuição'}</td>
+      <td>${fmtBRL(p.value)}</td>
+      <td>${escapeHtml(p.note)}</td>
+      <td><span class="tag-remove" onclick="deletePartnerPayment('${p.id}')">✕</span></td>
+    </tr>
+  `).join("") : `<tr><td colspan="6" class="empty">Nenhum lançamento de sócio ainda.</td></tr>`;
+}
+
+/* ==================== DESPESAS/RECEITAS RECORRENTES ==================== */
+function nextMonthKey(key){
+  const [y,m] = key.split("-").map(Number);
+  let ny=y, nm=m+1;
+  if(nm>12){ nm=1; ny+=1; }
+  return `${ny}-${String(nm).padStart(2,'0')}`;
+}
+function updateRecrModoOptions(){
+  const tipo = document.getElementById("recrTipo").value;
+  const sel = document.getElementById("recrModo");
+  sel.options[1].textContent = tipo==="despesa"
+    ? "Como pendência (entra em Contas a Pagar)"
+    : "Como pendência (entra em Boletos/NF a receber)";
+}
+function criarLancamentoRecorrente(item, comp){
+  const [y,m] = comp.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const dia = Math.min(parseInt(item.diaVencimento,10)||5, lastDay);
+  const dataISO = `${comp}-${String(dia).padStart(2,'0')}`;
+  const desc = item.descricao;
+  if(item.modo === "direto"){
+    state.transactions.push({
+      id: uid(), date: dataISO, description: desc,
+      value: item.tipo==="despesa" ? -Math.abs(item.valor) : Math.abs(item.valor),
+      costCenter: item.costCenter||"", serviceOrder: item.serviceOrder||"",
+      source: "recorrente", note: "", attachment: null
+    });
+  } else if(item.tipo === "despesa"){
+    state.payables.push({
+      id: uid(), descricao: desc, vencimento: dataISO, valor: Math.abs(item.valor),
+      costCenter: item.costCenter||"", serviceOrder: item.serviceOrder||"",
+      note: `Gerado automaticamente (recorrente: ${desc})`,
+      status: "pendente", dataPagamento: "", linkedTxId: null, recurringId: item.id
+    });
+  } else {
+    state.receivables.push({
+      id: uid(), cliente: desc, tipo: "Boleto", numero: "", dataEmissao: dataISO, vencimento: dataISO,
+      valor: Math.abs(item.valor), serviceOrder: item.serviceOrder||"", costCenter: item.costCenter||"",
+      note: `Gerado automaticamente (recorrente: ${desc})`,
+      status: "pendente", dataRecebimento: "", linkedTxId: null, recurringId: item.id
+    });
+  }
+}
+function gerarPendentesRecorrente(item){
+  if(!item.ativo) return 0;
+  const hojeMes = new Date().toISOString().slice(0,7);
+  let comp = item.ultimaCompetencia ? nextMonthKey(item.ultimaCompetencia) : hojeMes;
+  let count = 0;
+  let safety = 0;
+  while(comp <= hojeMes && safety < 240){
+    criarLancamentoRecorrente(item, comp);
+    item.ultimaCompetencia = comp;
+    count++; safety++;
+    comp = nextMonthKey(comp);
+  }
+  return count;
+}
+function processarTodasRecorrencias(silent){
+  let total = 0;
+  state.recurring.forEach(item=>{ total += gerarPendentesRecorrente(item); });
+  if(total>0){
+    saveState();
+    if(!silent) toast(`${total} lançamento(s) recorrente(s) gerado(s).`);
+    renderAll();
+    if(document.getElementById("tab-recorrentes").classList.contains("active")) renderRecurring();
+  } else if(!silent){
+    toast("Nada pendente — tudo já está gerado até o mês atual.");
+  }
+  return total;
+}
+function addRecurring(){
+  const descricao = document.getElementById("recrDesc").value.trim();
+  const tipo = document.getElementById("recrTipo").value;
+  const valor = parseFloat(document.getElementById("recrValor").value);
+  const diaVencimento = parseInt(document.getElementById("recrDia").value,10) || 5;
+  const cc = document.getElementById("recrCC").value;
+  const os = document.getElementById("recrOS").value;
+  const modo = document.getElementById("recrModo").value;
+  if(!descricao || isNaN(valor)){ alert("Preencha ao menos descrição e valor."); return; }
+  const item = {
+    id: uid(), descricao, tipo, valor: Math.abs(valor), diaVencimento,
+    costCenter: cc, serviceOrder: os, modo, ativo: true, ultimaCompetencia: ""
+  };
+  state.recurring.push(item);
+  gerarPendentesRecorrente(item); // já gera a competência do mês atual
+  saveState();
+  ["recrDesc","recrValor"].forEach(id=>document.getElementById(id).value="");
+  renderRecurring();
+  renderAll();
+  toast("Recorrência cadastrada e lançamento deste mês gerado.");
+}
+function toggleRecurring(id){
+  const item = state.recurring.find(x=>x.id===id);
+  if(item){ item.ativo = !item.ativo; saveState(); renderRecurring(); }
+}
+function deleteRecurring(id){
+  if(!confirm("Remover esta recorrência? Os lançamentos já gerados por ela não serão apagados.")) return;
+  state.recurring = state.recurring.filter(x=>x.id!==id);
+  saveState(); renderRecurring();
+}
+function renderRecurring(){
+  fillCCSelects(); fillOSSelects();
+  updateRecrModoOptions();
+  const tbody = document.getElementById("tblRecurring");
+  const items = state.recurring;
+  tbody.innerHTML = items.length ? items.map(item=>{
+    const modoLabel = item.modo==="direto" ? "Direto" : (item.tipo==="despesa" ? "Conta a pagar" : "Boleto/NF a receber");
+    const statusPill = item.ativo ? `<span class="pill green">Ativa</span>` : `<span class="pill red">Pausada</span>`;
+    const toggleLabel = item.ativo ? "Pausar" : "Reativar";
+    return `<tr>
+      <td>${escapeHtml(item.descricao)}</td>
+      <td>${item.tipo==="despesa"?"Despesa":"Receita"}</td>
+      <td class="${item.tipo==='despesa'?'val-neg':'val-pos'}">${fmtBRL(item.valor)}</td>
+      <td>${item.diaVencimento}</td>
+      <td>${modoLabel}</td>
+      <td>${item.ultimaCompetencia ? monthLabel(item.ultimaCompetencia) : '—'}</td>
+      <td>${statusPill}</td>
+      <td><div class="acoes-cell">
+        <button class="btn secondary small" onclick="toggleRecurring('${item.id}')">${toggleLabel}</button>
+        <span class="tag-remove" onclick="deleteRecurring('${item.id}')">✕</span>
+      </div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">Nenhuma despesa/receita recorrente cadastrada ainda.</td></tr>`;
+}
+
+/* ==================== PATRIMÔNIO ==================== */
+function mesesEntre(isoA, isoB){
+  const [ya,ma] = isoA.split("-").map(Number);
+  const [yb,mb] = isoB.split("-").map(Number);
+  return (yb-ya)*12 + (mb-ma);
+}
+function calcAtivo(item, ateData){
+  if(!item.vidaUtilAnos || item.vidaUtilAnos<=0){
+    return { depreciacaoAcumulada: 0, valorContabil: item.status==="baixado" ? 0 : item.valorAquisicao };
+  }
+  const limite = (item.status==="baixado" && item.dataBaixa && item.dataBaixa<ateData) ? item.dataBaixa : ateData;
+  const mesesVida = Math.round(item.vidaUtilAnos*12);
+  const valorDepreciavel = Math.max(item.valorAquisicao - (item.valorResidual||0), 0);
+  const depreciacaoMensal = mesesVida>0 ? valorDepreciavel/mesesVida : 0;
+  let meses = mesesEntre(item.dataAquisicao, limite);
+  meses = Math.max(0, Math.min(meses, mesesVida));
+  const depreciacaoAcumulada = depreciacaoMensal*meses;
+  let valorContabil = item.valorAquisicao - depreciacaoAcumulada;
+  if(item.status==="baixado") valorContabil = 0;
+  return { depreciacaoAcumulada, valorContabil: Math.max(valorContabil,0) };
+}
+async function addAsset(){
+  const descricao = document.getElementById("ativoDesc").value.trim();
+  const categoria = document.getElementById("ativoCategoria").value;
+  const dataAquisicao = document.getElementById("ativoData").value;
+  const valorAquisicao = parseFloat(document.getElementById("ativoValor").value);
+  const vidaUtilRaw = document.getElementById("ativoVidaUtil").value;
+  const vidaUtilAnos = vidaUtilRaw ? parseFloat(vidaUtilRaw) : null;
+  const valorResidual = parseFloat(document.getElementById("ativoValorResidual").value) || 0;
+  const cc = document.getElementById("ativoCC").value;
+  const os = document.getElementById("ativoOS").value;
+  const fornecedor = document.getElementById("ativoFornecedor").value.trim();
+  const numeroNF = document.getElementById("ativoNumeroNF").value.trim();
+  const gerarLancamento = document.getElementById("ativoGerarLancamento").checked;
+  const fileInput = document.getElementById("ativoAnexoFile");
+  const file = fileInput.files[0];
+
+  if(!descricao || !dataAquisicao || isNaN(valorAquisicao)){
+    alert("Preencha ao menos descrição, data de aquisição e valor.");
+    return;
+  }
+
+  const attachment = file ? await construirAnexo(file, descricao, dataAquisicao) : null;
+
+  const item = {
+    id: uid(), descricao, categoria, dataAquisicao, valorAquisicao,
+    vidaUtilAnos, valorResidual, costCenter: cc, serviceOrder: os,
+    fornecedor, numeroNF, attachment,
+    status: "ativo", dataBaixa: "", valorBaixa: 0,
+    linkedTxId: null, linkedBaixaTxId: null
+  };
+  if(gerarLancamento){
+    const tx = {
+      id: uid(), date: dataAquisicao, description: `Aquisição de patrimônio — ${descricao}`,
+      value: -Math.abs(valorAquisicao), costCenter: cc, serviceOrder: os,
+      source: "patrimonio", note: "", attachment: null
+    };
+    state.transactions.push(tx);
+    item.linkedTxId = tx.id;
+  }
+  state.assets.push(item);
+  saveState();
+  ["ativoDesc","ativoValor","ativoVidaUtil","ativoValorResidual","ativoFornecedor","ativoNumeroNF"].forEach(id=>document.getElementById(id).value="");
+  fileInput.value = "";
+  renderAssets();
+  renderAll();
+  toast(attachment && attachment.storage==="folder" ? "Item cadastrado e NF salva na pasta vinculada." : "Item de patrimônio cadastrado.");
+}
+function viewAssetAttachment(id){
+  const item = state.assets.find(x=>x.id===id);
+  if(item) abrirAnexo(item.attachment);
+}
+function baixarAsset(id){
+  const item = state.assets.find(x=>x.id===id);
+  if(!item) return;
+  const dataBaixaStr = prompt("Data da baixa/venda (dd/mm/aaaa):", fmtDateBR(todayStr()));
+  if(dataBaixaStr===null) return;
+  const iso = parseDateFlexible(dataBaixaStr) || todayStr();
+  const valorStr = prompt("Valor de venda (R$) — deixe 0 se foi descarte sem venda:", "0");
+  if(valorStr===null) return;
+  const valorBaixa = parseFloat(valorStr)||0;
+  item.status = "baixado"; item.dataBaixa = iso; item.valorBaixa = valorBaixa;
+  if(valorBaixa>0){
+    const tx = {
+      id: uid(), date: iso, description: `Venda/baixa de patrimônio — ${item.descricao}`,
+      value: Math.abs(valorBaixa), costCenter: item.costCenter||"", serviceOrder: item.serviceOrder||"",
+      source: "patrimonio", note: "", attachment: null
+    };
+    state.transactions.push(tx);
+    item.linkedBaixaTxId = tx.id;
+  }
+  saveState();
+  toast("Item baixado.");
+  renderAssets(); renderPainel();
+}
+function deleteAsset(id){
+  const item = state.assets.find(x=>x.id===id);
+  if(!item) return;
+  if(!confirm("Remover este item de patrimônio?")) return;
+  const idsToRemove = [item.linkedTxId, item.linkedBaixaTxId].filter(Boolean);
+  if(idsToRemove.length && confirm("Este item possui lançamento(s) financeiro(s) vinculados (compra/baixa). Remover também esses lançamentos?")){
+    state.transactions = state.transactions.filter(t=>!idsToRemove.includes(t.id));
+  }
+  state.assets = state.assets.filter(x=>x.id!==id);
+  saveState();
+  renderAssets(); renderPainel();
+}
+function renderAssets(){
+  fillCCSelects(); fillOSSelects();
+  const tbody = document.getElementById("tblAssets");
+  const hoje = todayStr();
+  const items = [...state.assets].sort((a,b)=>(a.dataAquisicao||'').localeCompare(b.dataAquisicao||''));
+  tbody.innerHTML = items.length ? items.map(item=>{
+    const calc = calcAtivo(item, hoje);
+    const statusPill = item.status==="baixado" ? `<span class="pill red">Baixado</span>` : `<span class="pill green">Ativo</span>`;
+    const anexoInfo = item.attachment
+      ? `<button class="btn secondary small" onclick="viewAssetAttachment('${item.id}')">Ver NF</button>`
+      : `<span class="note">—</span>`;
+    const acoes = item.status==="ativo"
+      ? `<button class="btn secondary small" onclick="baixarAsset('${item.id}')">Baixar</button>`
+      : "";
+    const codigoBadge = item.codigoPatrimonio ? `<br><span class="badge-source">Cód. ${escapeHtml(item.codigoPatrimonio)}</span>` : "";
+    return `<tr>
+      <td>${escapeHtml(item.descricao)}${codigoBadge}</td>
+      <td>${item.categoria}</td>
+      <td>${fmtDateBR(item.dataAquisicao)}<br><span class="badge-source">${fmtBRL(item.valorAquisicao)}</span></td>
+      <td>${item.vidaUtilAnos ? item.vidaUtilAnos+' anos' : 'Não deprecia'}</td>
+      <td>${fmtBRL(calc.valorContabil)}</td>
+      <td>${statusPill}</td>
+      <td>${anexoInfo}</td>
+      <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deleteAsset('${item.id}')">✕</span></div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">Nenhum item de patrimônio cadastrado ainda.</td></tr>`;
+
+  let totalAquisicao=0, totalDeprec=0, totalContabil=0;
+  items.forEach(item=>{
+    const calc = calcAtivo(item, hoje);
+    totalAquisicao += item.valorAquisicao;
+    totalDeprec += calc.depreciacaoAcumulada;
+    totalContabil += calc.valorContabil;
+  });
+  document.getElementById("resumoAssets").innerHTML =
+    `Valor de aquisição (total): <b>${fmtBRL(totalAquisicao)}</b> &nbsp;|&nbsp; Depreciação acumulada: <b class="val-neg">${fmtBRL(totalDeprec)}</b> &nbsp;|&nbsp; Valor contábil atual: <b class="val-pos">${fmtBRL(totalContabil)}</b>`;
+
+  renderPatrimonioResumo();
+}
+function renderPatrimonioResumo(){
+  const table = document.getElementById("tblPatrimonioBalancete");
+  if(!table) return;
+  const hoje = todayStr();
+  const categorias = {};
+  state.assets.forEach(item=>{
+    const calc = calcAtivo(item, hoje);
+    const cat = item.categoria || "Outros";
+    if(!categorias[cat]) categorias[cat] = {aquisicao:0, deprec:0, contabil:0};
+    categorias[cat].aquisicao += item.valorAquisicao;
+    categorias[cat].deprec += calc.depreciacaoAcumulada;
+    categorias[cat].contabil += calc.valorContabil;
+  });
+  const rows = Object.entries(categorias);
+  let totalAq=0, totalDep=0, totalCont=0;
+  let body = rows.map(([cat,v])=>{
+    totalAq+=v.aquisicao; totalDep+=v.deprec; totalCont+=v.contabil;
+    return `<tr><td>${cat}</td><td>${fmtBRL(v.aquisicao)}</td><td class="val-neg">${fmtBRL(v.deprec)}</td><td><b>${fmtBRL(v.contabil)}</b></td></tr>`;
+  }).join("");
+  if(!rows.length) body = `<tr><td colspan="4" class="empty">Nenhum item de patrimônio cadastrado ainda. Cadastre na aba Patrimônio.</td></tr>`;
+  else body += `<tr style="background:#f0f1f4"><td><b>Total</b></td><td><b>${fmtBRL(totalAq)}</b></td><td class="val-neg"><b>${fmtBRL(totalDep)}</b></td><td><b>${fmtBRL(totalCont)}</b></td></tr>`;
+  table.innerHTML = `<thead><tr><th>Categoria</th><th>Valor de aquisição</th><th>Depreciação acumulada</th><th>Valor contábil atual</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+/* ==================== IMPORTAÇÃO DE PLANILHA DE PATRIMÔNIO ==================== */
+function isoFromCellDate(val){
+  if(val instanceof Date && !isNaN(val)){
+    const y = val.getUTCFullYear(), m = val.getUTCMonth()+1, d = val.getUTCDate();
+    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+  return parseDateFlexible(String(val||"").trim()) || "";
+}
+function categoriaPorPalavraChave(descricao){
+  const d = (descricao||"").toLowerCase();
+  if(/ve[íi]culo|carro|moto\b|placa|caminh[aã]o|caminhonete/.test(d)) return "Veículos";
+  if(/notebook|computador|\bpc\b|servidor|celular|tablet|nobreak|monitor|impressora|roteador|modem/.test(d)) return "Equipamentos de Informática";
+  if(/im[óo]vel|sala comercial|terreno|galp[ãa]o/.test(d)) return "Imóveis";
+  if(/mesa|cadeira|arm[áa]rio|estante|sof[áa]|prateleira|m[óo]vel|mobili[áa]rio/.test(d)) return "Mobiliário e Utensílios";
+  return "Máquinas e Equipamentos";
+}
+function normalizarCategoria(txt){
+  const t = (txt||"").trim().toLowerCase();
+  if(!t) return "";
+  if(t.includes("escrit")) return "Mobiliário e Utensílios";
+  if(t.includes("equipamento") || t.includes("ferramenta") || t.includes("máquina") || t.includes("maquina")) return "Máquinas e Equipamentos";
+  if(t.includes("veículo") || t.includes("veiculo")) return "Veículos";
+  if(t.includes("informática") || t.includes("informatica")) return "Equipamentos de Informática";
+  if(t.includes("imóve") || t.includes("imove")) return "Imóveis";
+  return txt.trim();
+}
+function pareceSerPlanilhaPatrimonio(linha){
+  const l = (linha||[]).map(c=>String(c||"").toLowerCase());
+  return l.some(c=>c.includes("descri")) && l.some(c=>c.includes("valor"));
+}
+function encontrarHeaderPatrimonio(rows){
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    if(pareceSerPlanilhaPatrimonio(rows[i])) return i;
+  }
+  return -1;
+}
+function extrairVidaUtilDoHeader(headerRow){
+  for(const cell of headerRow){
+    const m = String(cell||"").match(/(\d+(?:[.,]\d+)?)\s*%/);
+    if(m){
+      const pct = parseFloat(m[1].replace(",","."));
+      if(pct>0) return Math.round(100/pct);
+    }
+  }
+  return null;
+}
+function importarLinhasPatrimonio(rows, headerIdx, nomeAba, vidaUtilPadrao){
+  const header = rows[headerIdx].map(c=>String(c||"").trim().toLowerCase());
+  const idx = {
+    primeira: 0,
+    descricao: header.findIndex(h=>h.includes("descri")),
+    data: header.findIndex(h=>h.includes("data")),
+    valor: header.findIndex(h=>h.includes("valor") && !h.includes("deprecia")),
+    nf: header.findIndex(h=>h.includes("nf")),
+    obs: header.findIndex(h=>h.includes("observa"))
+  };
+  if(idx.descricao<0 || idx.valor<0) return {novos:0, duplicados:0, ignorados:0};
+  const vidaUtilDetectada = extrairVidaUtilDoHeader(rows[headerIdx]);
+  const vidaUtilUsar = vidaUtilDetectada!==null ? vidaUtilDetectada : (vidaUtilPadrao || null);
+
+  let novos=0, duplicados=0, ignorados=0;
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r) continue;
+    const descricao = String(r[idx.descricao]||"").trim();
+    if(!descricao) continue;
+    const valorRaw = r[idx.valor];
+    const valor = typeof valorRaw === "number" ? valorRaw : parseBRNumber(valorRaw);
+    if(isNaN(valor) || valor<=0){ ignorados++; continue; }
+
+    const dataAquisicao = idx.data>=0 ? isoFromCellDate(r[idx.data]) : "";
+    const primeiraColRaw = String(r[idx.primeira]||"").trim();
+    const ehCodigo = /^\d+$/.test(primeiraColRaw);
+    const codigoPatrimonio = ehCodigo ? primeiraColRaw : "";
+    const categoria = ehCodigo ? categoriaPorPalavraChave(descricao) : (normalizarCategoria(primeiraColRaw) || categoriaPorPalavraChave(descricao));
+
+    let numeroNF = idx.nf>=0 ? String(r[idx.nf]||"").trim() : "";
+    let fornecedor = idx.obs>=0 ? String(r[idx.obs]||"").trim() : "";
+    let status = "ativo";
+    const notaExtra = [];
+    const textoCompleto = r.map(c=>String(c||"")).join(" | ").toUpperCase();
+    if(textoCompleto.includes("BAIXADO")){
+      status = "baixado";
+      if(fornecedor.toUpperCase().includes("BAIXADO")) fornecedor = "";
+    }
+    if(textoCompleto.includes("FALTA NF")) notaExtra.push("Falta NF");
+
+    const chaveImport = codigoPatrimonio
+      ? `cod:${codigoPatrimonio}`
+      : `desc:${descricao.toLowerCase()}|${dataAquisicao}|${valor}`;
+    if(state.assets.some(a=>a.importKey === chaveImport)){ duplicados++; continue; }
+
+    state.assets.push({
+      id: uid(), descricao, categoria: categoria || "Outros",
+      dataAquisicao: dataAquisicao || todayStr(),
+      valorAquisicao: valor, vidaUtilAnos: vidaUtilUsar, valorResidual: 0,
+      costCenter: "", serviceOrder: "", fornecedor, numeroNF,
+      attachment: null, status, dataBaixa: "", valorBaixa: 0,
+      linkedTxId: null, linkedBaixaTxId: null,
+      codigoPatrimonio, importKey: chaveImport,
+      note: notaExtra.length ? `Importado (${nomeAba}). ${notaExtra.join("; ")}.` : `Importado (${nomeAba}).`
+    });
+    novos++;
+  }
+  return {novos, duplicados, ignorados};
+}
+async function handlePatrimonioImportFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("patrimonioImportStatus");
+  statusEl.textContent = "Lendo planilha...";
+  const vidaUtilPadraoRaw = document.getElementById("patrimonioVidaUtilPadrao").value;
+  const vidaUtilPadrao = vidaUtilPadraoRaw ? parseFloat(vidaUtilPadraoRaw) : null;
+  try{
+    if(!window.XLSX) throw new Error("Leitor de planilha não carregou (verifique sua conexão com a internet) e tente novamente.");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:"array", cellDates:true});
+    let totalNovos=0, totalDuplicados=0, totalIgnorados=0;
+    const abasProcessadas = [];
+    wb.SheetNames.forEach(nome=>{
+      const ws = wb.Sheets[nome];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
+      const headerIdx = encontrarHeaderPatrimonio(rows);
+      if(headerIdx<0) return;
+      const r = importarLinhasPatrimonio(rows, headerIdx, nome, vidaUtilPadrao);
+      totalNovos += r.novos; totalDuplicados += r.duplicados; totalIgnorados += r.ignorados;
+      abasProcessadas.push(nome);
+    });
+    if(!abasProcessadas.length){
+      statusEl.textContent = 'Não encontrei nenhuma aba com colunas de patrimônio (preciso ao menos de "Descrição" e "Valor").';
+    } else {
+      statusEl.textContent = `Aba(s) processada(s): ${abasProcessadas.join(", ")}. ${totalNovos} item(ns) novo(s) importado(s), ${totalDuplicados} já existente(s) (ignorado${totalDuplicados===1?"":"s"} para não duplicar), ${totalIgnorados} linha(s) sem dados suficientes.`;
+      saveState();
+      renderAssets();
+      renderAll();
+      toast("Importação de patrimônio concluída.");
+    }
+  }catch(err){
+    statusEl.textContent = "Erro ao importar: " + err.message;
+  }
+  evt.target.value = "";
+}
+
+/* ==================== ESTOQUE ==================== */
+let stockConferenciaBuffer = [];
+
+function calcEstoqueItem(itemId){
+  const movs = state.stockMovements.filter(m=>m.itemId===itemId)
+    .sort((a,b)=> (a.date||"").localeCompare(b.date||"") || String(a.id).localeCompare(String(b.id)));
+  let quantidade = 0, custoMedio = 0;
+  movs.forEach(m=>{
+    const qtd = parseFloat(m.quantidade)||0;
+    if(m.tipo === "entrada"){
+      const valorAtual = quantidade*custoMedio;
+      const valorEntrada = qtd*(parseFloat(m.valorUnitario)||0);
+      const novaQtd = quantidade+qtd;
+      custoMedio = novaQtd>0 ? (valorAtual+valorEntrada)/novaQtd : 0;
+      quantidade = novaQtd;
+    } else {
+      quantidade -= qtd;
+    }
+  });
+  return {quantidade, custoMedio, valorTotal: quantidade*custoMedio};
+}
+function addOrGetStockItem(nome, unidade){
+  const nomeTrim = (nome||"").trim();
+  if(!nomeTrim) return null;
+  const existente = state.stockItems.find(it=>it.nome.toLowerCase()===nomeTrim.toLowerCase());
+  if(existente) return existente.id;
+  const id = uid();
+  state.stockItems.push({id, nome: nomeTrim, unidade: (unidade||"UN").trim() || "UN"});
+  return id;
+}
+function fillStockItemSelects(){
+  document.querySelectorAll(".stock-item-select-target").forEach(sel=>{
+    const current = sel.value;
+    sel.innerHTML = `<option value="">— selecionar —</option>` + state.stockItems.map(it=>`<option value="${it.id}">${escapeHtml(it.nome)} (${it.unidade})</option>`).join("");
+    if(current) sel.value = current;
+  });
+}
+function atualizarCamposMovimento(){
+  const tipo = document.getElementById("movTipo").value;
+  document.getElementById("movValorField").style.display = tipo==="entrada" ? "" : "none";
+  document.getElementById("movOSField").style.display = tipo==="saida" ? "" : "none";
+}
+function addMovimentoManual(){
+  const tipo = document.getElementById("movTipo").value;
+  let itemId = document.getElementById("movItem").value;
+  const nomeNovo = document.getElementById("movItemNovoNome").value.trim();
+  const unidadeNova = document.getElementById("movItemNovaUnidade").value.trim();
+  if(!itemId && nomeNovo) itemId = addOrGetStockItem(nomeNovo, unidadeNova);
+  if(!itemId){ alert("Selecione um item existente ou informe o nome de um novo item."); return; }
+  const quantidade = parseFloat(document.getElementById("movQuantidade").value) || 0;
+  if(quantidade<=0){ alert("Informe uma quantidade maior que zero."); return; }
+  const data = document.getElementById("movData").value || todayStr();
+  const nota = document.getElementById("movNota").value.trim();
+  if(tipo === "saida"){
+    const atual = calcEstoqueItem(itemId);
+    if(quantidade > atual.quantidade + 0.0001){
+      if(!confirm(`O estoque atual desse item é ${atual.quantidade}. Essa saída deixaria o saldo negativo. Registrar mesmo assim?`)) return;
+    }
+    const os = document.getElementById("movOS").value;
+    state.stockMovements.push({id:uid(), date:data, itemId, tipo:"saida", quantidade, valorUnitario: atual.custoMedio, serviceOrder: os||"", note: nota, linkedTxId:null});
+  } else {
+    const valorUnitario = parseFloat(document.getElementById("movValorUnitario").value) || 0;
+    state.stockMovements.push({id:uid(), date:data, itemId, tipo:"entrada", quantidade, valorUnitario, serviceOrder:"", note: nota, linkedTxId:null});
+  }
+  saveState();
+  document.getElementById("movQuantidade").value = "";
+  document.getElementById("movValorUnitario").value = "";
+  document.getElementById("movNota").value = "";
+  document.getElementById("movItemNovoNome").value = "";
+  document.getElementById("movItemNovaUnidade").value = "";
+  renderEstoque();
+  toast("Movimentação registrada.");
+}
+function removeMovimento(id){
+  if(!confirm("Remover esta movimentação? O saldo do item será recalculado.")) return;
+  state.stockMovements = state.stockMovements.filter(m=>m.id!==id);
+  saveState();
+  renderEstoque();
+}
+function removeStockItem(id){
+  const calc = calcEstoqueItem(id);
+  if(Math.abs(calc.quantidade) > 0.0001){
+    if(!confirm("Esse item ainda tem saldo em estoque. Remover mesmo assim? As movimentações associadas também serão removidas.")) return;
+  } else if(!confirm("Remover este item do estoque?")) return;
+  state.stockItems = state.stockItems.filter(it=>it.id!==id);
+  state.stockMovements = state.stockMovements.filter(m=>m.itemId!==id);
+  saveState();
+  renderEstoque();
+}
+function renderEstoque(){
+  fillOSSelects();
+  fillStockItemSelects();
+  document.getElementById("movData").value = document.getElementById("movData").value || todayStr();
+  atualizarCamposMovimento();
+
+  const tbodyItens = document.getElementById("tblStockItems");
+  let valorTotalEstoque = 0;
+  tbodyItens.innerHTML = state.stockItems.length ? state.stockItems.map(it=>{
+    const calc = calcEstoqueItem(it.id);
+    valorTotalEstoque += calc.valorTotal;
+    return `<tr>
+      <td>${escapeHtml(it.nome)}</td>
+      <td>${escapeHtml(it.unidade)}</td>
+      <td>${calc.quantidade}</td>
+      <td>${fmtBRL(calc.custoMedio)}</td>
+      <td><b>${fmtBRL(calc.valorTotal)}</b></td>
+      <td><span class="tag-remove" onclick="removeStockItem('${it.id}')">✕</span></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="6" class="empty">Nenhum item de estoque cadastrado ainda.</td></tr>`;
+  document.getElementById("resumoEstoque").innerHTML = `Valor total em estoque: <b class="val-pos">${fmtBRL(valorTotalEstoque)}</b>`;
+
+  const tbodyMov = document.getElementById("tblStockMovements");
+  const movs = [...state.stockMovements].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  tbodyMov.innerHTML = movs.length ? movs.map(m=>{
+    const item = state.stockItems.find(it=>it.id===m.itemId);
+    const tipoPill = m.tipo==="entrada" ? `<span class="pill green">Entrada</span>` : `<span class="pill red">Saída</span>`;
+    const valorTotal = (parseFloat(m.quantidade)||0) * (parseFloat(m.valorUnitario)||0);
+    return `<tr>
+      <td>${fmtDateBR(m.date)}</td>
+      <td>${item ? escapeHtml(item.nome) : '<em>— item removido —</em>'}</td>
+      <td>${tipoPill}</td>
+      <td>${m.quantidade}</td>
+      <td>${fmtBRL(m.valorUnitario)}</td>
+      <td>${fmtBRL(valorTotal)}</td>
+      <td>${m.serviceOrder || '<em>—</em>'}</td>
+      <td>${escapeHtml(m.note||'')}</td>
+      <td><span class="tag-remove" onclick="removeMovimento('${m.id}')">✕</span></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">Nenhuma movimentação registrada ainda.</td></tr>`;
+}
+function renderEstoqueResumo(){
+  const table = document.getElementById("tblEstoqueBalancete");
+  if(!table) return;
+  let valorTotal = 0;
+  const rows = state.stockItems.map(it=>{
+    const calc = calcEstoqueItem(it.id);
+    valorTotal += calc.valorTotal;
+    return `<tr><td>${escapeHtml(it.nome)}</td><td>${calc.quantidade} ${escapeHtml(it.unidade)}</td><td>${fmtBRL(calc.custoMedio)}</td><td><b>${fmtBRL(calc.valorTotal)}</b></td></tr>`;
+  });
+  let body = rows.join("");
+  if(!rows.length) body = `<tr><td colspan="4" class="empty">Nenhum item de estoque cadastrado ainda. Cadastre na aba Estoque.</td></tr>`;
+  else body += `<tr style="background:#f0f1f4"><td colspan="3"><b>Total</b></td><td><b>${fmtBRL(valorTotal)}</b></td></tr>`;
+  table.innerHTML = `<thead><tr><th>Item</th><th>Quantidade</th><th>Custo médio</th><th>Valor em estoque</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+/* ==================== IMPORTAÇÃO DE NF (ENTRADA DE ESTOQUE) ==================== */
+function parseNFeXML(xmlText){
+  const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+  if(doc.getElementsByTagName("parsererror").length) throw new Error("Arquivo XML inválido ou corrompido.");
+  const get1 = (el, tag) => el ? (el.getElementsByTagName(tag)[0]?.textContent || "") : "";
+  const ide = doc.getElementsByTagName("ide")[0];
+  const emit = doc.getElementsByTagName("emit")[0];
+  const numeroNF = get1(ide, "nNF");
+  const dataEmissaoRaw = get1(ide, "dhEmi") || get1(ide, "dEmi");
+  const dataEmissao = dataEmissaoRaw ? dataEmissaoRaw.slice(0,10) : "";
+  const fornecedor = get1(emit, "xNome");
+  const dets = doc.getElementsByTagName("det");
+  const itens = [];
+  for(let i=0;i<dets.length;i++){
+    const prod = dets[i].getElementsByTagName("prod")[0];
+    if(!prod) continue;
+    const get = (tag) => get1(prod, tag);
+    itens.push({
+      descricao: get("xProd"),
+      unidade: get("uCom") || "UN",
+      quantidade: parseFloat(get("qCom"))||0,
+      valorUnitario: parseFloat(get("vUnCom"))||0,
+      valorTotal: parseFloat(get("vProd"))||0,
+    });
+  }
+  if(!itens.length) throw new Error("Não encontrei itens de produto no XML (procurei por <det><prod>). Confirme se é o XML da NF-e.");
+  return {numeroNF, dataEmissao, fornecedor, itens};
+}
+async function extrairItensDanfePDF(file){
+  if(!window.pdfjsLib) throw new Error("Leitor de PDF não carregou (verifique sua conexão com a internet) e tente novamente.");
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const allItems = [];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    content.items.forEach(it=>{
+      if(!it.str || !it.str.trim()) return;
+      allItems.push({page:p, x: it.transform[4], y: it.transform[5], str: it.str.trim()});
+    });
+  }
+  allItems.sort((a,b)=> a.page-b.page || b.y-a.y || a.x-b.x);
+  const linhas = [];
+  let atual = null;
+  allItems.forEach(it=>{
+    if(atual && atual.page===it.page && Math.abs(atual.y-it.y)<3){
+      atual.items.push(it);
+    } else {
+      atual = {page:it.page, y:it.y, items:[it]};
+      linhas.push(atual);
+    }
+  });
+  const norm = s => s.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const normCompacto = s => norm(s).replace(/[^A-Z0-9]/g,"");
+  let headerIdx = -1;
+  for(let i=0;i<linhas.length;i++){
+    const texto = linhas[i].items.map(it=>norm(it.str)).join(" ");
+    if(texto.includes("DESCRICAO") && (texto.includes("QUANT") || texto.includes("QTDE"))){ headerIdx = i; break; }
+  }
+  if(headerIdx<0) return {itens:[], aviso:"Não encontrei a tabela de itens no PDF. Confirme se é o DANFE da NF."};
+
+  const header = linhas[headerIdx].items;
+  function acharColuna(...chaves){
+    const alvo = header.find(it=>chaves.some(c=>normCompacto(it.str).includes(c)));
+    return alvo ? alvo.x : null;
+  }
+  const colunas = [
+    {nome:"codigo", x: acharColuna("CODIGO","CODPROD")},
+    {nome:"descricao", x: acharColuna("DESCRICAO")},
+    {nome:"ncm", x: acharColuna("NCM")},
+    {nome:"cst", x: acharColuna("CST")},
+    {nome:"cfop", x: acharColuna("CFOP")},
+    {nome:"unid", x: acharColuna("UNID")},
+    {nome:"quant", x: acharColuna("QUANT","QTDE")},
+    {nome:"valorUnit", x: acharColuna("VALORUNIT","VLUNIT")},
+    {nome:"valorTotal", x: acharColuna("VALORTOTAL","VLTOTAL")},
+  ].filter(c=>c.x!==null).sort((a,b)=>a.x-b.x);
+
+  if(colunas.length<3) return {itens:[], aviso:"Não consegui identificar as colunas da tabela de itens no PDF."};
+
+  function colunaDe(x){
+    let escolhida = colunas[0];
+    for(const c of colunas){ if(x >= c.x-5) escolhida = c; else break; }
+    return escolhida.nome;
+  }
+  const paraMarcas = ["CALCULODOIMPOSTO","DADOSADICIONAIS","INFORMACOESCOMPLEMENTARES","RESERVADOAOFISCO","DADOSDOTRANSPORTE"];
+  const itensBrutos = [];
+  for(let i=headerIdx+1;i<linhas.length;i++){
+    const textoLinha = normCompacto(linhas[i].items.map(it=>it.str).join(""));
+    if(paraMarcas.some(m=>textoLinha.includes(m))) break;
+    const campos = {};
+    linhas[i].items.forEach(it=>{
+      const col = colunaDe(it.x);
+      campos[col] = (campos[col] ? campos[col]+" " : "") + it.str;
+    });
+    if(Object.keys(campos).length) itensBrutos.push(campos);
+  }
+  const itens = [];
+  itensBrutos.forEach(c=>{
+    const temValor = (c.quant && c.quant.trim()) || (c.valorTotal && c.valorTotal.trim());
+    if(!temValor && itens.length && c.descricao){
+      itens[itens.length-1].descricao += " " + c.descricao;
+      return;
+    }
+    if(!c.descricao && !temValor) return;
+    itens.push({
+      descricao: (c.descricao||"").trim(),
+      unidade: (c.unid||"UN").trim() || "UN",
+      quantidade: parseBRNumber(c.quant)||0,
+      valorUnitario: parseBRNumber(c.valorUnit)||0,
+      valorTotal: parseBRNumber(c.valorTotal)||0,
+    });
+  });
+  return {itens, aviso: itens.length ? "" : "Não consegui reconhecer os itens automaticamente — adicione manualmente abaixo."};
+}
+async function handleNFFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("nfImportStatus");
+  statusEl.textContent = "Lendo NF...";
+  try{
+    const nome = file.name.toLowerCase();
+    let dados;
+    if(nome.endsWith(".xml")){
+      const texto = await file.text();
+      dados = parseNFeXML(texto);
+    } else if(nome.endsWith(".pdf")){
+      const r = await extrairItensDanfePDF(file);
+      dados = {numeroNF:"", dataEmissao:"", fornecedor:"", itens:r.itens, aviso:r.aviso};
+    } else {
+      throw new Error("Formato não suportado. Envie o XML da NF-e ou o PDF do DANFE.");
+    }
+    if(!dados.itens.length) throw new Error(dados.aviso || "Não encontrei itens na NF.");
+    openEstoqueConferencia(dados);
+    statusEl.textContent = `${dados.itens.length} item(ns) encontrado(s)${dados.aviso?' — '+dados.aviso:''}. Revise e confirme abaixo.`;
+  }catch(err){
+    statusEl.textContent = "Erro ao importar NF: " + err.message;
+  }
+  evt.target.value = "";
+}
+function openEstoqueConferencia(dados){
+  stockConferenciaBuffer = dados.itens.map(it=>({...it}));
+  document.getElementById("nfFornecedor").value = dados.fornecedor || "";
+  document.getElementById("nfNumero").value = dados.numeroNF || "";
+  document.getElementById("nfData").value = dados.dataEmissao || todayStr();
+  document.getElementById("estoqueConferenciaCard").style.display = "block";
+  renderEstoqueConferencia();
+  irParaAba("conferencias");
+}
+function renderEstoqueConferencia(){
+  const tbody = document.getElementById("tblEstoqueConferencia");
+  tbody.innerHTML = stockConferenciaBuffer.map((row,i)=>{
+    const valorTotal = (parseFloat(row.quantidade)||0)*(parseFloat(row.valorUnitario)||0);
+    return `<tr>
+      <td><input type="text" value="${(row.descricao||'').replace(/"/g,'&quot;')}" onchange="stockConfUpdate(${i},'descricao',this.value)"></td>
+      <td><input type="text" value="${(row.unidade||'UN').replace(/"/g,'&quot;')}" onchange="stockConfUpdate(${i},'unidade',this.value)"></td>
+      <td><input type="number" step="0.01" value="${row.quantidade||0}" onchange="stockConfUpdate(${i},'quantidade',this.value)"></td>
+      <td><input type="number" step="0.01" value="${row.valorUnitario||0}" onchange="stockConfUpdate(${i},'valorUnitario',this.value)"></td>
+      <td>${fmtBRL(valorTotal)}</td>
+      <td><span class="tag-remove" onclick="stockConfRemove(${i})">✕</span></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">Nenhum item. Clique em "+ Adicionar item".</td></tr>`;
+}
+function stockConfUpdate(i, field, value){
+  const row = stockConferenciaBuffer[i];
+  if(field === "quantidade" || field === "valorUnitario") row[field] = parseFloat(value)||0;
+  else row[field] = value;
+  renderEstoqueConferencia();
+}
+function stockConfRemove(i){ stockConferenciaBuffer.splice(i,1); renderEstoqueConferencia(); }
+function addStockManualRow(){
+  stockConferenciaBuffer.push({descricao:"", unidade:"UN", quantidade:0, valorUnitario:0});
+  renderEstoqueConferencia();
+}
+function cancelarEstoqueConferencia(){
+  stockConferenciaBuffer = [];
+  document.getElementById("estoqueConferenciaCard").style.display = "none";
+  renderConferenciasPendentes();
+}
+function confirmarEntradasEstoque(){
+  const invalidas = stockConferenciaBuffer.filter(r=>!r.descricao || !(parseFloat(r.quantidade)>0));
+  if(invalidas.length){
+    if(!confirm(`${invalidas.length} item(ns) sem descrição ou sem quantidade válida. Lançar mesmo assim os demais?`)){
+      return;
+    }
+  }
+  const fornecedor = document.getElementById("nfFornecedor").value.trim();
+  const numeroNF = document.getElementById("nfNumero").value.trim();
+  const data = document.getElementById("nfData").value || todayStr();
+  const nota = [fornecedor, numeroNF ? `NF nº ${numeroNF}` : ""].filter(Boolean).join(" — ");
+  let criados = 0;
+  stockConferenciaBuffer.forEach(r=>{
+    if(!r.descricao || !(parseFloat(r.quantidade)>0)) return;
+    const itemId = addOrGetStockItem(r.descricao, r.unidade);
+    state.stockMovements.push({
+      id: uid(), date: data, itemId, tipo: "entrada",
+      quantidade: parseFloat(r.quantidade)||0, valorUnitario: parseFloat(r.valorUnitario)||0,
+      serviceOrder: "", note: nota, linkedTxId: null
+    });
+    criados++;
+  });
+  saveState();
+  toast(`${criados} entrada(s) de estoque registrada(s).`);
+  cancelarEstoqueConferencia();
+  document.getElementById("nfFile").value = "";
+  renderEstoque();
+  renderBalancete();
+}
+
+/* ==================== CONFERÊNCIAS (aba única) ==================== */
+function marcarRevisado(id){
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  t.revisar = false;
+  t.revisarMotivo = "";
+  saveState();
+  renderConferenciasPendentes();
+  renderLancamentos();
+}
+function renderConferenciasPendentes(){
+  const conferenciaAberta = document.getElementById("conferenciaCard").style.display !== "none";
+  const estoqueAberta = document.getElementById("estoqueConferenciaCard").style.display !== "none";
+  const pendentesRevisao = state.transactions.filter(t=>t.revisar);
+
+  const revisaoCard = document.getElementById("revisaoCard");
+  if(pendentesRevisao.length){
+    revisaoCard.style.display = "block";
+    document.getElementById("tblRevisao").innerHTML = pendentesRevisao
+      .sort((a,b)=>(b.date||"").localeCompare(a.date||""))
+      .map(t=>`<tr>
+        <td>${fmtDateBR(t.date)}</td>
+        <td>${escapeHtml(t.description||"")}</td>
+        <td class="${t.value>=0?'val-pos':'val-neg'}">${fmtBRL(t.value)}</td>
+        <td>${escapeHtml(t.revisarMotivo||"")}</td>
+        <td><button class="btn secondary small" onclick="marcarRevisado('${t.id}')">Marcar como revisado</button></td>
+      </tr>`).join("");
+  } else {
+    revisaoCard.style.display = "none";
+  }
+
+  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + pendentesRevisao.length;
+  const vazio = document.getElementById("conferenciasVazio");
+  vazio.style.display = totalPendencias===0 ? "block" : "none";
+
+  const badge = document.getElementById("navBadgeConferencias");
+  if(totalPendencias>0){
+    badge.style.display = "inline-block";
+    badge.textContent = totalPendencias;
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+/* ==================== RENDER GERAL ==================== */
+function renderAll(){
+  renderCC();
+  renderPainel();
+  renderLancamentos();
+  renderBalancete();
+  renderConferenciasPendentes();
+}
+
+loadState();
+processarTodasRecorrencias(true);
+renderAll();
+initAnexosDir();
+</script>
+</body>
+</html>
