@@ -507,7 +507,19 @@
     </div>
 
     <div class="card">
-      <h2>Pagamentos a receber</h2>
+      <div class="flex-between">
+        <h2>Pagamentos a receber</h2>
+        <div class="field">
+          <label>Filtrar por situação</label>
+          <select id="receivablesFiltroSelect" class="small-input" style="width:160px;" onchange="setReceivablesFiltro(this.value)">
+            <option value="todos">Todos</option>
+            <option value="aberto">Em aberto</option>
+            <option value="vencido">Vencido</option>
+            <option value="recebido">Recebido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+      </div>
       <div style="overflow-x:auto;">
         <table>
           <thead><tr><th>Cliente</th><th>Tipo/Nº</th><th>Emissão</th><th>Vencimento</th><th>Valor</th><th>OS</th><th>Status</th><th>Ações</th></tr></thead>
@@ -1786,6 +1798,7 @@ function confirmarLancamentos(){
     if(!confirm(msg + "Lançar mesmo assim? Elas ficarão marcadas para revisão.")) return;
   }
   let novosAtivos = 0;
+  let recebiveisBaixados = 0;
   conferenciaBuffer.forEach(r=>{
     const motivos = [];
     if(!r.date || !r.description) motivos.push("Sem data ou descrição");
@@ -1814,6 +1827,16 @@ function confirmarLancamentos(){
         revisar, revisarMotivo
       };
       state.transactions.push(tx);
+      if(!revisar && tx.value>0){
+        const candidato = encontrarReceivablePendenteParaMatch(tx);
+        if(candidato){
+          candidato.status = "recebido";
+          candidato.dataRecebimento = tx.date;
+          candidato.linkedTxId = tx.id;
+          candidato.note = (candidato.note ? candidato.note+" — " : "") + "Baixado automaticamente ao importar o extrato.";
+          recebiveisBaixados++;
+        }
+      }
       if(r.classificacao === "Patrimônio/Investimento"){
         const codigo = proximoCodigoPatrimonio();
         state.assets.push({
@@ -1832,7 +1855,7 @@ function confirmarLancamentos(){
     }
   });
   saveState();
-  toast(`${conferenciaBuffer.length} linha(s) de lançamento confirmadas.${novosAtivos?` ${novosAtivos} item(ns) de patrimônio criado(s) automaticamente (código gerado).`:''}`);
+  toast(`${conferenciaBuffer.length} linha(s) de lançamento confirmadas.${novosAtivos?` ${novosAtivos} item(ns) de patrimônio criado(s) automaticamente (código gerado).`:''}${recebiveisBaixados?` ${recebiveisBaixados} título(s) de "Boletos/NF a receber" baixado(s) automaticamente.`:''}`);
   cancelarConferencia();
   document.getElementById("csvText").value = "";
   renderAll();
@@ -2236,11 +2259,33 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtDateBR(iso){ return iso ? iso.split('-').reverse().join('/') : '—'; }
 
 /* ==================== BOLETOS / NF — A RECEBER ==================== */
+let receivablesFiltro = "todos";
+function setReceivablesFiltro(v){
+  receivablesFiltro = v;
+  renderReceivables();
+}
 function renderReceivables(){
   fillOSSelects(); fillCCSelects();
+  const selectEl = document.getElementById("receivablesFiltroSelect");
+  if(selectEl) selectEl.value = receivablesFiltro;
   const tbody = document.getElementById("tblReceivables");
-  const items = [...state.receivables].sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||''));
+  const todos = [...state.receivables].sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||''));
   let totalPendente=0, totalRecebido=0, totalCancelado=0;
+  todos.forEach(r=>{
+    if(r.status==='pendente') totalPendente += r.valor;
+    else if(r.status==='recebido') totalRecebido += r.valor;
+    else if(r.status==='cancelado') totalCancelado += r.valor;
+  });
+  const items = todos.filter(r=>{
+    const vencido = r.status==='pendente' && r.vencimento && r.vencimento < todayStr();
+    switch(receivablesFiltro){
+      case "aberto": return r.status==='pendente' && !vencido;
+      case "vencido": return vencido;
+      case "recebido": return r.status==='recebido';
+      case "cancelado": return r.status==='cancelado';
+      default: return true;
+    }
+  });
   tbody.innerHTML = items.length ? items.map(r=>{
     const vencido = r.status==='pendente' && r.vencimento && r.vencimento < todayStr();
     const statusPill = r.status==='recebido'
@@ -2248,9 +2293,6 @@ function renderReceivables(){
       : r.status==='cancelado'
       ? `<span class="pill" style="background:#eee;color:#888">Cancelado</span>`
       : vencido ? `<span class="pill red">Vencido</span>` : `<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>`;
-    if(r.status==='pendente') totalPendente += r.valor;
-    else if(r.status==='recebido') totalRecebido += r.valor;
-    else if(r.status==='cancelado') totalCancelado += r.valor;
     const acoes = r.status==='pendente'
       ? `<button class="btn secondary small" onclick="markReceived('${r.id}')">Marcar recebido</button>`
       : '';
@@ -2264,7 +2306,7 @@ function renderReceivables(){
       <td>${statusPill}</td>
       <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deleteReceivable('${r.id}')">✕</span></div></td>
     </tr>`;
-  }).join("") : `<tr><td colspan="8" class="empty">Nenhum boleto/NF registrado ainda.</td></tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">${todos.length ? 'Nenhum título nessa situação.' : 'Nenhum boleto/NF registrado ainda.'}</td></tr>`;
   document.getElementById("resumoReceivables").innerHTML =
     `Pendente: <b>${fmtBRL(totalPendente)}</b> &nbsp;|&nbsp; Recebido: <b class="val-pos">${fmtBRL(totalRecebido)}</b>${totalCancelado?` &nbsp;|&nbsp; Cancelado: <b>${fmtBRL(totalCancelado)}</b>`:''}`;
 }
@@ -2315,6 +2357,23 @@ function deleteReceivable(id){
   state.receivables = state.receivables.filter(x=>x.id!==id);
   saveState();
   renderReceivables(); renderPainel();
+}
+// Ao importar o extrato, tenta casar automaticamente um lançamento de receita com um título
+// pendente de "Boletos/NF a receber" — mesmo valor (tolerância de poucos centavos) e vencimento
+// perto da data do lançamento. Só baixa automaticamente quando encontra exatamente um candidato,
+// pra não arriscar baixar o título errado.
+function encontrarReceivablePendenteParaMatch(tx){
+  if(!tx || tx.value<=0 || !tx.date) return null;
+  const TOL_VALOR = 0.02;
+  const JANELA_DIAS = 20;
+  const candidatos = state.receivables.filter(r=>{
+    if(r.status !== "pendente") return false;
+    if(!r.vencimento) return false;
+    if(Math.abs(Math.abs(r.valor) - Math.abs(tx.value)) > TOL_VALOR) return false;
+    const dv = Math.abs((new Date(tx.date+"T00:00:00Z") - new Date(r.vencimento+"T00:00:00Z"))/86400000);
+    return dv <= JANELA_DIAS;
+  });
+  return candidatos.length === 1 ? candidatos[0] : null;
 }
 
 /* ==================== IMPORTAÇÃO DO RELATÓRIO DE BOLETOS (SICREDI) ==================== */
