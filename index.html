@@ -118,6 +118,7 @@
   <button data-tab="centros">Centros de Custo</button>
   <button data-tab="recorrentes">Recorrentes</button>
   <button data-tab="receber">Boletos/NF (a receber)</button>
+  <button data-tab="notas">Notas Fiscais</button>
   <button data-tab="pagar">Contas a Pagar</button>
   <button data-tab="socios">Sócios</button>
   <button data-tab="patrimonio">Patrimônio</button>
@@ -267,6 +268,11 @@
       <div>
         <h2>Conferência de boleto / NF importado</h2>
         <div class="desc" id="receberConferenciaDesc">Revise os campos abaixo (alguns podem ter vindo em branco, dependendo do PDF) e complete o que faltar antes de confirmar.</div>
+        <div id="receberConferenciaVinculoArea" style="display:none;background:#e7f0fb;border:1px solid #b8d0ee;border-radius:8px;padding:10px;margin-bottom:10px;">
+          <div id="receberConferenciaVinculoTexto" style="margin-bottom:8px;"></div>
+          <button type="button" class="btn secondary small" onclick="vincularReceberAoComplemento()">🔗 Vincular a esse título (não criar novo)</button>
+          <button type="button" class="btn secondary small" onclick="desfazerVinculoReceber()">Criar título separado mesmo assim</button>
+        </div>
         <div class="note" id="receberConferenciaAvisoDuplicado" style="display:none;color:#b8720a;font-weight:600;"></div>
       </div>
       <div class="row">
@@ -534,6 +540,36 @@
         </table>
       </div>
       <div class="note" id="resumoReceivables"></div>
+    </div>
+  </div>
+
+  <!-- NOTAS FISCAIS EMITIDAS -->
+  <div class="tab" id="tab-notas">
+    <div class="card">
+      <h2>Notas fiscais emitidas</h2>
+      <div class="desc">Todas as NF (e NF+Boleto) registradas em "Boletos/NF a receber", com o documento de pagamento vinculado (boleto, PIX, TED...) e se já foi recebida.</div>
+      <div class="row" style="align-items:flex-end;">
+        <div class="field"><label>Mês de emissão</label><select id="notasFiltroMes" class="small-input" onchange="renderNotasFiscais()"></select></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="notasFiltroCliente" placeholder="Buscar por nome..." oninput="renderNotasFiscais()"></div>
+        <div class="field"><label>Valor mínimo</label><input type="number" step="0.01" id="notasFiltroValorMin" class="small-input" placeholder="0,00" oninput="renderNotasFiscais()"></div>
+        <div class="field"><label>Valor máximo</label><input type="number" step="0.01" id="notasFiltroValorMax" class="small-input" placeholder="0,00" oninput="renderNotasFiscais()"></div>
+        <div class="field"><label>Situação</label>
+          <select id="notasFiltroStatus" class="small-input" style="width:140px;" onchange="renderNotasFiscais()">
+            <option value="todos">Todas</option>
+            <option value="aberto">Em aberto</option>
+            <option value="vencido">Vencido</option>
+            <option value="recebido">Recebido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Nº NF</th><th>Cliente</th><th>Emissão</th><th>Valor</th><th>Forma de pagamento</th><th>Documento de pagamento</th><th>Vencimento</th><th>Status</th></tr></thead>
+          <tbody id="tblNotasFiscais"></tbody>
+        </table>
+      </div>
+      <div class="note" id="resumoNotasFiscais"></div>
     </div>
   </div>
 
@@ -812,7 +848,7 @@ let state = {
   costCenters: [...DEFAULT_CC],
   serviceOrders: [],
   transactions: [], // {id, date:'YYYY-MM-DD', description, value(+/-), costCenter, serviceOrder, source, note, attachment:{name,type,dataUrl,size}|null}
-  receivables: [], // {id, cliente, tipo, formaPagamento:'Boleto'|'PIX'|'TED'|'Outro', numero, dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido'|'cancelado', dataRecebimento, linkedTxId}
+  receivables: [], // {id, cliente, tipo:'NF'|'Boleto'|'NF+Boleto'|..., formaPagamento:'Boleto'|'PIX'|'TED'|'Outro', numero (nº da NF quando tipo inclui NF, senão nº do boleto), numeroBoleto (nº do boleto quando o título é NF+Boleto), nossoNumero (nº interno do banco, do relatório Sicredi), dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido'|'cancelado', dataRecebimento, linkedTxId}
   payables: [], // {id, descricao, vencimento, valor, costCenter, serviceOrder, note, status:'pendente'|'pago', dataPagamento, linkedTxId}
   partners: [], // ['Alex','Bruno/Jessica']
   partnerPayments: [], // {id, date, partner, tipo:'pro-labore'|'distribuicao', value, note}
@@ -1192,6 +1228,7 @@ function irParaAba(tab){
   if(tab==="centros") renderCC();
   if(tab==="recorrentes") renderRecurring();
   if(tab==="receber") renderReceivables();
+  if(tab==="notas") renderNotasFiscais();
   if(tab==="pagar") renderPayables();
   if(tab==="socios") renderSocios();
   if(tab==="patrimonio") renderAssets();
@@ -2318,6 +2355,64 @@ function renderReceivables(){
   document.getElementById("resumoReceivables").innerHTML =
     `Pendente: <b>${fmtBRL(totalPendente)}</b> &nbsp;|&nbsp; Recebido: <b class="val-pos">${fmtBRL(totalRecebido)}</b>${totalCancelado?` &nbsp;|&nbsp; Cancelado: <b>${fmtBRL(totalCancelado)}</b>`:''}`;
 }
+
+/* ==================== NOTAS FISCAIS EMITIDAS ==================== */
+function renderNotasFiscais(){
+  const notas = state.receivables.filter(r=>r.tipo==='NF' || r.tipo==='NF+Boleto');
+
+  const selMes = document.getElementById("notasFiltroMes");
+  const mesesComNota = [...new Set(notas.map(r=>monthKey(r.dataEmissao)).filter(Boolean))].sort().reverse();
+  const curMes = selMes.value;
+  selMes.innerHTML = `<option value="todos">Todos os meses</option>` + mesesComNota.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+  if(mesesComNota.includes(curMes) || curMes==="todos") selMes.value = curMes || "todos"; else selMes.value = "todos";
+
+  const filtroMes = selMes.value;
+  const filtroCliente = normalizarTexto(document.getElementById("notasFiltroCliente").value);
+  const valorMin = parseFloat(document.getElementById("notasFiltroValorMin").value);
+  const valorMax = parseFloat(document.getElementById("notasFiltroValorMax").value);
+  const filtroStatus = document.getElementById("notasFiltroStatus").value;
+
+  const items = notas.filter(r=>{
+    if(filtroMes!=="todos" && monthKey(r.dataEmissao)!==filtroMes) return false;
+    if(filtroCliente && !normalizarTexto(r.cliente).includes(filtroCliente)) return false;
+    if(!isNaN(valorMin) && r.valor < valorMin) return false;
+    if(!isNaN(valorMax) && r.valor > valorMax) return false;
+    const vencido = r.status==='pendente' && r.vencimento && r.vencimento < todayStr();
+    switch(filtroStatus){
+      case "aberto": if(!(r.status==='pendente' && !vencido)) return false; break;
+      case "vencido": if(!vencido) return false; break;
+      case "recebido": if(r.status!=='recebido') return false; break;
+      case "cancelado": if(r.status!=='cancelado') return false; break;
+    }
+    return true;
+  }).sort((a,b)=>(b.dataEmissao||'').localeCompare(a.dataEmissao||''));
+
+  const tbody = document.getElementById("tblNotasFiscais");
+  let total = 0;
+  tbody.innerHTML = items.length ? items.map(r=>{
+    total += r.valor;
+    const vencido = r.status==='pendente' && r.vencimento && r.vencimento < todayStr();
+    const statusPill = r.status==='recebido'
+      ? `<span class="pill green">Recebido</span>`
+      : r.status==='cancelado'
+      ? `<span class="pill" style="background:#eee;color:#888">Cancelado</span>`
+      : vencido ? `<span class="pill red">Vencido</span>` : `<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>`;
+    const docPagamento = r.tipo==='NF+Boleto'
+      ? `Boleto${r.numeroBoleto? ' nº '+escapeHtml(r.numeroBoleto) : (r.nossoNumero? ' (Nosso Nº '+escapeHtml(r.nossoNumero)+')' : '')}`
+      : `<span class="note">Só NF, sem boleto vinculado ainda</span>`;
+    return `<tr>
+      <td>${r.numero? escapeHtml(r.numero) : '—'}</td>
+      <td>${escapeHtml(r.cliente)}</td>
+      <td>${fmtDateBR(r.dataEmissao)}</td>
+      <td class="val-pos">${fmtBRL(r.valor)}</td>
+      <td>${escapeHtml(r.formaPagamento||'—')}</td>
+      <td>${docPagamento}</td>
+      <td>${fmtDateBR(r.vencimento)}</td>
+      <td>${statusPill}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">${notas.length ? 'Nenhuma NF encontrada com esses filtros.' : 'Nenhuma NF emitida registrada ainda (lance pela aba Boletos/NF a receber).'}</td></tr>`;
+  document.getElementById("resumoNotasFiscais").innerHTML = `${items.length} nota(s) — total: <b>${fmtBRL(total)}</b>`;
+}
 // Usado para evitar lançar o mesmo boleto/NF duas vezes (ex: uma vez manual/PDF e depois de
 // novo pelo relatório do banco, ou simplesmente clicar "Registrar" duas vezes sem querer).
 function normalizarTexto(s){
@@ -2334,6 +2429,23 @@ function encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, exclud
     Math.abs(Math.abs(r.valor)-Math.abs(valor))<0.02
   ) || null;
 }
+// Quando a NF e o boleto do mesmo pagamento são importados em PDFs separados (comum: a
+// prefeitura manda a NF e o banco manda o boleto em arquivos diferentes), acha o título
+// pendente do tipo complementar (NF procura Boleto, e vice-versa) pra sugerir vincular os dois
+// num título só, em vez de criar dois registros separados pro mesmo pagamento.
+function encontrarComplementoParaVincular(cliente, tipoAtual, valor){
+  if(tipoAtual!=="NF" && tipoAtual!=="Boleto") return null;
+  const tipoAlvo = tipoAtual==="NF" ? "Boleto" : "NF";
+  const clienteNorm = normalizarTexto(cliente);
+  if(!clienteNorm || isNaN(valor)) return null;
+  const candidatos = state.receivables.filter(r=>
+    r.status==="pendente" &&
+    r.tipo===tipoAlvo &&
+    normalizarTexto(r.cliente)===clienteNorm &&
+    Math.abs(Math.abs(r.valor)-Math.abs(valor))<0.02
+  );
+  return candidatos.length===1 ? candidatos[0] : null;
+}
 function addReceivable(){
   const cliente = document.getElementById("recCliente").value.trim();
   const tipo = document.getElementById("recTipo").value;
@@ -2349,10 +2461,11 @@ function addReceivable(){
   const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
   if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
-    id: uid(), cliente, tipo, formaPagamento, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    id: uid(), cliente, tipo, formaPagamento, numero, numeroBoleto:"", nossoNumero:"", dataEmissao, vencimento, valor,
     serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
   });
   saveState();
+  renderNotasFiscais();
   ["recCliente","recNumero","recValor","recNota"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("recFormaPagamento").value = "";
   renderReceivables();
@@ -2373,7 +2486,7 @@ function markReceived(id){
   r.status = "recebido"; r.dataRecebimento = iso; r.linkedTxId = tx.id;
   saveState();
   toast("Recebimento lançado no financeiro.");
-  renderReceivables(); renderPainel();
+  renderReceivables(); renderPainel(); renderNotasFiscais();
 }
 function deleteReceivable(id){
   const r = state.receivables.find(x=>x.id===id);
@@ -2384,7 +2497,7 @@ function deleteReceivable(id){
   }
   state.receivables = state.receivables.filter(x=>x.id!==id);
   saveState();
-  renderReceivables(); renderPainel();
+  renderReceivables(); renderPainel(); renderNotasFiscais();
 }
 // Agrupa os títulos por cliente (normalizado) + vencimento + valor pra achar lançamentos
 // repetidos (ex: um importado manualmente e depois de novo pelo relatório do banco).
@@ -2457,6 +2570,7 @@ async function handleBoletosReportFile(evt){
     saveState();
     renderReceivables();
     renderPainel();
+    renderNotasFiscais();
     toast("Relatório de boletos importado.");
   }catch(err){
     statusEl.textContent = "Erro ao importar o relatório: " + err.message;
@@ -2548,7 +2662,7 @@ function importarRelatorioBoletos(rows){
       }
     } else {
       const novo = {
-        id: uid(), cliente, tipo: "Boleto", formaPagamento: "Boleto", numero, nossoNumero,
+        id: uid(), cliente, tipo: "Boleto", formaPagamento: "Boleto", numero, numeroBoleto:"", nossoNumero,
         dataEmissao, vencimento, valor,
         serviceOrder: "", costCenter: "",
         note: "Importado do relatório de boletos (Sicredi).",
@@ -2792,7 +2906,7 @@ function criarLancamentoRecorrente(item, comp){
     });
   } else {
     state.receivables.push({
-      id: uid(), cliente: desc, tipo: "Boleto", numero: "", dataEmissao: dataISO, vencimento: dataISO,
+      id: uid(), cliente: desc, tipo: "Boleto", formaPagamento: "Boleto", numero: "", numeroBoleto: "", nossoNumero: "", dataEmissao: dataISO, vencimento: dataISO,
       valor: Math.abs(item.valor), serviceOrder: item.serviceOrder||"", costCenter: item.costCenter||"",
       note: `Gerado automaticamente (recorrente: ${desc})`,
       status: "pendente", dataRecebimento: "", linkedTxId: null, recurringId: item.id
@@ -3774,8 +3888,22 @@ function openReceberConferencia(dados){
   fillOSSelects(); fillCCSelects();
   document.getElementById("recConfOS").value = "";
   document.getElementById("recConfCC").value = "";
-  const avisoEl = document.getElementById("receberConferenciaAvisoDuplicado");
   const valorNum = dados.valor!==undefined && dados.valor!=="" ? parseFloat(dados.valor) : NaN;
+
+  // Sugere vincular quando o tipo detectado é só NF ou só Boleto e existe um título pendente
+  // do tipo complementar pro mesmo cliente/valor (provavelmente o mesmo pagamento em 2 PDFs).
+  receberComplementoPendente = encontrarComplementoParaVincular(dados.cliente, dados.tipo, valorNum);
+  const vinculoArea = document.getElementById("receberConferenciaVinculoArea");
+  if(receberComplementoPendente){
+    const c = receberComplementoPendente;
+    vinculoArea.style.display = "block";
+    document.getElementById("receberConferenciaVinculoTexto").textContent =
+      `🔗 Encontrei um título pendente que parece ser o ${c.tipo==='NF'?'NF':'boleto'} correspondente a esse pagamento: ${c.cliente}, ${c.tipo}${c.numero?' nº '+c.numero:''}, ${fmtBRL(c.valor)}. Quer juntar os dois num título só?`;
+  } else {
+    vinculoArea.style.display = "none";
+  }
+
+  const avisoEl = document.getElementById("receberConferenciaAvisoDuplicado");
   const dup = encontrarPossivelDuplicadoReceivable(dados.cliente, dados.vencimento, valorNum, null);
   if(dup){
     avisoEl.style.display = "block";
@@ -3786,6 +3914,47 @@ function openReceberConferencia(dados){
   }
   document.getElementById("receberConferenciaCard").style.display = "block";
   irParaAba("conferencias");
+}
+let receberComplementoPendente = null;
+function desfazerVinculoReceber(){
+  receberComplementoPendente = null;
+  document.getElementById("receberConferenciaVinculoArea").style.display = "none";
+}
+function vincularReceberAoComplemento(){
+  if(!receberComplementoPendente) return;
+  const c = receberComplementoPendente;
+  const numero = document.getElementById("recConfNumero").value.trim();
+  const dataEmissao = document.getElementById("recConfEmissao").value;
+  const vencimento = document.getElementById("recConfVencimento").value;
+  const formaPagamento = document.getElementById("recConfFormaPagamento").value;
+  const os = document.getElementById("recConfOS").value;
+  const cc = document.getElementById("recConfCC").value;
+  const nota = document.getElementById("recConfNota").value.trim();
+  const tipoAtual = document.getElementById("recConfTipo").value; // "NF" ou "Boleto"
+
+  if(tipoAtual==="NF"){
+    // este PDF é a NF; c é o boleto já existente
+    c.numeroBoleto = c.numero || c.numeroBoleto || "";
+    c.numero = numero || c.numero;
+    if(!c.dataEmissao) c.dataEmissao = dataEmissao;
+  } else {
+    // este PDF é o boleto; c é a NF já existente
+    c.numeroBoleto = numero || c.numeroBoleto || "";
+    if(!c.vencimento) c.vencimento = vencimento;
+  }
+  c.tipo = "NF+Boleto";
+  if(!c.formaPagamento) c.formaPagamento = formaPagamento || "Boleto";
+  if(os && !c.serviceOrder) c.serviceOrder = os;
+  if(cc && !c.costCenter) c.costCenter = cc;
+  if(nota) c.note = (c.note ? c.note+" — " : "") + nota;
+  saveState();
+  toast("NF e boleto vinculados num título só.");
+  receberComplementoPendente = null;
+  cancelarReceberConferencia();
+  document.getElementById("receberPdfFile").value = "";
+  document.getElementById("receberPdfStatus").textContent = "";
+  renderReceivables();
+  renderNotasFiscais();
 }
 function cancelarReceberConferencia(){
   document.getElementById("receberConferenciaCard").style.display = "none";
@@ -3806,11 +3975,12 @@ function confirmarReceberConferencia(){
   const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
   if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
-    id: uid(), cliente, tipo, formaPagamento, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    id: uid(), cliente, tipo, formaPagamento, numero, numeroBoleto:"", nossoNumero:"", dataEmissao, vencimento, valor,
     serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
   });
   saveState();
   toast("Título registrado a partir do PDF.");
+  renderNotasFiscais();
   cancelarReceberConferencia();
   document.getElementById("receberPdfFile").value = "";
   document.getElementById("receberPdfStatus").textContent = "";
