@@ -263,6 +263,30 @@
       </div>
     </div>
 
+    <div class="card" id="receberConferenciaCard" style="display:none;">
+      <div>
+        <h2>Conferência de boleto / NF importado</h2>
+        <div class="desc" id="receberConferenciaDesc">Revise os campos abaixo (alguns podem ter vindo em branco, dependendo do PDF) e complete o que faltar antes de confirmar.</div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="recConfCliente" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Tipo</label><select id="recConfTipo"><option value="Boleto">Boleto</option><option value="NF">NF</option><option value="NF+Boleto">NF + Boleto</option></select></div>
+        <div class="field"><label>Número</label><input type="text" id="recConfNumero" class="small-input" placeholder="Nº"></div>
+        <div class="field"><label>Emissão</label><input type="date" id="recConfEmissao"></div>
+        <div class="field"><label>Vencimento</label><input type="date" id="recConfVencimento"></div>
+        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="recConfValor" class="small-input" placeholder="0,00"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="recConfOS"></select></div>
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="recConfCC"></select></div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="recConfNota" placeholder="Opcional"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn" onclick="confirmarReceberConferencia()">Confirmar e registrar</button>
+        <button class="btn secondary" onclick="cancelarReceberConferencia()">Cancelar</button>
+      </div>
+    </div>
+
     <div class="card" id="revisaoCard" style="display:none;">
       <h2>Lançamentos marcados para revisão</h2>
       <div class="desc">Lançamentos que foram confirmados mesmo com algum problema (sem OS obrigatória, sem data/descrição, saldo do extrato não batendo etc). Corrija o que for preciso e marque como revisado.</div>
@@ -464,6 +488,15 @@
         <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="recNota" placeholder="Opcional"></div>
         <div class="field"><button class="btn" onclick="addReceivable()">Registrar</button></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Importar boleto ou NF (PDF)</h2>
+      <div class="desc">Envie o PDF do boleto emitido ou da nota fiscal (NFS-e). Para boletos, o valor e o vencimento são lidos direto da linha digitável — bem confiável, independente do banco. Para a NF, o sistema tenta reconhecer os campos mais comuns, mas pode vir incompleto dependendo do sistema da prefeitura. De qualquer forma, você revisa e confirma antes de salvar.</div>
+      <div class="row">
+        <div class="field"><label>Arquivo PDF</label><input type="file" id="receberPdfFile" accept=".pdf" onchange="handleReceberPdfFile(event)"></div>
+      </div>
+      <div class="note" id="receberPdfStatus"></div>
     </div>
 
     <div class="card">
@@ -3378,6 +3411,166 @@ function confirmarEntradasEstoque(){
   renderBalancete();
 }
 
+/* ==================== IMPORTAÇÃO DE BOLETO/NF (PDF) ==================== */
+async function extrairTextoPDFPorLinhas(file){
+  if(!window.pdfjsLib) throw new Error("Leitor de PDF não carregou (verifique sua conexão com a internet) e tente novamente.");
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const allItems = [];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    content.items.forEach(it=>{
+      if(!it.str || !it.str.trim()) return;
+      allItems.push({page:p, x: it.transform[4], y: it.transform[5], str: it.str});
+    });
+  }
+  allItems.sort((a,b)=> a.page-b.page || b.y-a.y || a.x-b.x);
+  const linhas = [];
+  let atual = null;
+  allItems.forEach(it=>{
+    if(atual && atual.page===it.page && Math.abs(atual.y-it.y)<3){
+      atual.str += " " + it.str;
+    } else {
+      atual = {page:it.page, y:it.y, str:it.str};
+      linhas.push(atual);
+    }
+  });
+  return linhas.map(l=>l.str.replace(/\s+/g," ").trim());
+}
+function decodeLinhaDigitavel(textoCompleto){
+  const t = textoCompleto.replace(/[\r\n]+/g," ");
+  let digits = null;
+  const m = t.match(/(\d{5}\.?\d{5})\D{0,3}(\d{5}\.?\d{6})\D{0,3}(\d{5}\.?\d{6})\D{0,3}(\d)\D{0,3}(\d{14})/);
+  if(m){
+    digits = (m[1]+m[2]+m[3]+m[4]+m[5]).replace(/\D/g,"");
+  } else {
+    const m2 = t.replace(/[^\d]/g,"").match(/\d{47}/);
+    if(m2) digits = m2[0];
+  }
+  if(!digits || digits.length!==47) return null;
+  const fator = parseInt(digits.slice(33,37),10);
+  const valorCentavos = parseInt(digits.slice(37,47),10);
+  let vencimento = "";
+  if(fator>0 && fator<9999){
+    const base = Date.UTC(1997,9,7);
+    const d = new Date(base + fator*86400000);
+    vencimento = d.toISOString().slice(0,10);
+  }
+  return {valor: valorCentavos/100, vencimento};
+}
+function buscarCampoEmLinhas(linhas, rotulos){
+  for(let i=0;i<linhas.length;i++){
+    for(const r of rotulos){
+      const reResto = new RegExp(r+"\\s*[:\\-]?\\s*(.+)$","i");
+      const m = linhas[i].match(reResto);
+      if(m && m[1] && m[1].trim()) return m[1].trim();
+      const reSo = new RegExp("^\\s*"+r+"\\s*[:\\-]?\\s*$","i");
+      if(reSo.test(linhas[i]) && linhas[i+1] && linhas[i+1].trim()) return linhas[i+1].trim();
+    }
+  }
+  return "";
+}
+async function handleReceberPdfFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("receberPdfStatus");
+  statusEl.textContent = "Lendo PDF...";
+  try{
+    const linhas = await extrairTextoPDFPorLinhas(file);
+    const textoCompleto = linhas.join("\n");
+    if(!textoCompleto.trim()){
+      statusEl.textContent = "Não consegui ler texto neste PDF (pode ser uma imagem escaneada). Preencha manualmente na conferência abaixo.";
+      openReceberConferencia({});
+      return;
+    }
+    const boleto = decodeLinhaDigitavel(textoCompleto);
+    const clienteTexto = buscarCampoEmLinhas(linhas, [
+      "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
+      "Nome do Pagador","Pagador","Sacado"
+    ]);
+    const numeroTexto = buscarCampoEmLinhas(linhas, [
+      "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota","Nosso N[úu]mero"
+    ]);
+    const numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
+    const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
+      "Data e Hora de Emiss[ãa]o","Data de Emiss[ãa]o","Emiss[ãa]o"
+    ]);
+    const dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
+    const valorTexto = buscarCampoEmLinhas(linhas, [
+      "Valor L[íi]quido da Nota","Valor Total da Nota","Valor Total do Servi[çc]o","Valor dos Servi[çc]os","Valor Total"
+    ]);
+    const valorNFMatch = valorTexto.match(/[\d.,]+/);
+    const valorNF = valorNFMatch ? parseBRNumber(valorNFMatch[0]) : NaN;
+
+    const temBoleto = !!boleto;
+    const temNF = !isNaN(valorNF) || !!numero || !!clienteTexto;
+    let tipo = "Boleto";
+    if(temBoleto && temNF) tipo = "NF+Boleto";
+    else if(!temBoleto && temNF) tipo = "NF";
+
+    const dados = {
+      cliente: clienteTexto || "",
+      tipo,
+      numero: numero || "",
+      dataEmissao: dataEmissao,
+      vencimento: (boleto && boleto.vencimento) || "",
+      valor: temBoleto ? boleto.valor : (isNaN(valorNF) ? "" : valorNF),
+    };
+    const faltando = [];
+    if(!dados.cliente) faltando.push("cliente");
+    if(!dados.vencimento) faltando.push("vencimento");
+    if(dados.valor==="" || dados.valor===undefined || isNaN(dados.valor)) faltando.push("valor");
+    statusEl.textContent = faltando.length
+      ? `PDF lido. Não consegui identificar: ${faltando.join(", ")} — complete na conferência abaixo.`
+      : "PDF lido com sucesso. Revise os dados abaixo antes de confirmar.";
+    openReceberConferencia(dados);
+  }catch(err){
+    statusEl.textContent = "Erro ao importar PDF: " + err.message;
+  }
+  evt.target.value = "";
+}
+function openReceberConferencia(dados){
+  document.getElementById("recConfCliente").value = dados.cliente || "";
+  document.getElementById("recConfTipo").value = dados.tipo || "Boleto";
+  document.getElementById("recConfNumero").value = dados.numero || "";
+  document.getElementById("recConfEmissao").value = dados.dataEmissao || "";
+  document.getElementById("recConfVencimento").value = (dados.vencimento && dados.vencimento!=="") ? dados.vencimento : "";
+  document.getElementById("recConfValor").value = (dados.valor!==undefined && dados.valor!=="" && !isNaN(dados.valor)) ? dados.valor : "";
+  document.getElementById("recConfNota").value = "";
+  fillOSSelects(); fillCCSelects();
+  document.getElementById("recConfOS").value = "";
+  document.getElementById("recConfCC").value = "";
+  document.getElementById("receberConferenciaCard").style.display = "block";
+  irParaAba("conferencias");
+}
+function cancelarReceberConferencia(){
+  document.getElementById("receberConferenciaCard").style.display = "none";
+  renderConferenciasPendentes();
+}
+function confirmarReceberConferencia(){
+  const cliente = document.getElementById("recConfCliente").value.trim();
+  const tipo = document.getElementById("recConfTipo").value;
+  const numero = document.getElementById("recConfNumero").value.trim();
+  const dataEmissao = document.getElementById("recConfEmissao").value;
+  const vencimento = document.getElementById("recConfVencimento").value;
+  const valor = parseFloat(document.getElementById("recConfValor").value);
+  const os = document.getElementById("recConfOS").value;
+  const cc = document.getElementById("recConfCC").value;
+  const nota = document.getElementById("recConfNota").value.trim();
+  if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor antes de confirmar."); return; }
+  state.receivables.push({
+    id: uid(), cliente, tipo, numero, nossoNumero:"", dataEmissao, vencimento, valor,
+    serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
+  });
+  saveState();
+  toast("Título registrado a partir do PDF.");
+  cancelarReceberConferencia();
+  document.getElementById("receberPdfFile").value = "";
+  document.getElementById("receberPdfStatus").textContent = "";
+  renderReceivables();
+}
+
 /* ==================== CONFERÊNCIAS (aba única) ==================== */
 function marcarRevisado(id){
   const t = state.transactions.find(x=>x.id===id);
@@ -3391,6 +3584,7 @@ function marcarRevisado(id){
 function renderConferenciasPendentes(){
   const conferenciaAberta = document.getElementById("conferenciaCard").style.display !== "none";
   const estoqueAberta = document.getElementById("estoqueConferenciaCard").style.display !== "none";
+  const receberAberta = document.getElementById("receberConferenciaCard").style.display !== "none";
   const pendentesRevisao = state.transactions.filter(t=>t.revisar);
 
   const revisaoCard = document.getElementById("revisaoCard");
@@ -3409,7 +3603,7 @@ function renderConferenciasPendentes(){
     revisaoCard.style.display = "none";
   }
 
-  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + pendentesRevisao.length;
+  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + pendentesRevisao.length;
   const vazio = document.getElementById("conferenciasVazio");
   vazio.style.display = totalPendencias===0 ? "block" : "none";
 
