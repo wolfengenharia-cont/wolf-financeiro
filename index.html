@@ -295,6 +295,58 @@
       </div>
     </div>
 
+    <div class="card" id="nfConferenciaCard" style="display:none;">
+      <div>
+        <h2>Conferência de nota fiscal</h2>
+        <div class="desc" id="nfConferenciaDesc">A nota já foi lida e guardada. Revise os dados abaixo, escolha a forma de pagamento e complete o que faltar antes de confirmar.</div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="nfConfCliente" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Número da NF</label><input type="text" id="nfConfNumero" class="small-input" placeholder="Nº"></div>
+        <div class="field"><label>Emissão</label><input type="date" id="nfConfEmissao"></div>
+        <div class="field"><label>Valor total (R$)</label><input type="number" step="0.01" id="nfConfValor" class="small-input" placeholder="0,00"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="nfConfOS"></select></div>
+        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="nfConfCC"></select></div>
+        <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="nfConfNota" placeholder="Opcional"></div>
+      </div>
+      <div class="row" style="align-items:flex-end;">
+        <div class="field">
+          <label>Forma de pagamento</label>
+          <select id="nfConfFormaPagamento" onchange="mudarFormaPagamentoNF()">
+            <option value="">— selecione —</option>
+            <option value="Boleto">Boleto</option>
+            <option value="PIX">PIX</option>
+            <option value="TED">TED</option>
+            <option value="À vista">À vista</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="nfConfBoletoArea" style="display:none;margin-top:10px;background:#f7f8fb;padding:10px;border-radius:8px;">
+        <div class="desc">Envie o(s) PDF(s) do(s) boleto(s) referentes a essa nota. Se a nota foi parcelada em mais de um boleto, envie todos de uma vez (ou um por um) — cada boleto vira uma parcela, com número, valor e vencimento próprios, lidos automaticamente da linha digitável.</div>
+        <input type="file" id="nfBoletoPdfFile" accept=".pdf" multiple onchange="handleNfBoletoPdfFile(event)">
+        <div class="note" id="nfBoletoPdfStatus"></div>
+        <div style="overflow-x:auto;margin-top:10px;">
+          <table>
+            <thead><tr><th>Parcela</th><th>Nº do boleto</th><th>Valor (R$)</th><th>Vencimento</th><th>PDF</th><th></th></tr></thead>
+            <tbody id="tblNfParcelas"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn secondary small" style="margin-top:8px;" onclick="adicionarParcelaManualNF()">+ Adicionar parcela manualmente</button>
+      </div>
+
+      <div id="nfConfVencimentoArea" style="display:none;margin-top:10px;">
+        <div class="field"><label>Vencimento</label><input type="date" id="nfConfVencimentoUnico"></div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <button class="btn" onclick="confirmarNfConferencia()">Confirmar e registrar</button>
+        <button class="btn secondary" onclick="cancelarNfConferencia()">Cancelar</button>
+      </div>
+    </div>
+
     <div class="card" id="revisaoCard" style="display:none;">
       <h2>Lançamentos marcados para revisão</h2>
       <div class="desc">Lançamentos que foram confirmados mesmo com algum problema (sem OS obrigatória, sem data/descrição, saldo do extrato não batendo etc). Corrija o que for preciso e marque como revisado.</div>
@@ -500,8 +552,17 @@
     </div>
 
     <div class="card">
-      <h2>Importar boleto ou NF (PDF)</h2>
-      <div class="desc">Envie o PDF do boleto emitido ou da nota fiscal (NFS-e). Para boletos, o valor e o vencimento são lidos direto da linha digitável — bem confiável, independente do banco. Para a NF, o sistema tenta reconhecer os campos mais comuns, mas pode vir incompleto dependendo do sistema da prefeitura. De qualquer forma, você revisa e confirma antes de salvar.</div>
+      <h2>Nova nota fiscal (PDF)</h2>
+      <div class="desc">Envie o PDF da nota fiscal (NFS-e) emitida. O sistema guarda o PDF (pra você consultar depois) e já tenta ler cliente, emissão e valor automaticamente. Depois é só escolher a forma de pagamento: se for boleto, você envia o(s) PDF(s) do(s) boleto(s) e o sistema lê número, valor e vencimento de cada parcela; se for PIX, TED ou à vista, só falta informar o vencimento.</div>
+      <div class="row">
+        <div class="field"><label>Arquivo PDF da NF</label><input type="file" id="nfPdfFile" accept=".pdf" onchange="handleNfPdfFile(event)"></div>
+      </div>
+      <div class="note" id="nfPdfStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Importar boleto ou NF avulso (PDF)</h2>
+      <div class="desc">Para os casos fora do fluxo guiado acima: um boleto que chegou separado (sem passar pela "Nova nota fiscal"), ou uma NF antiga pra registrar rápido. Envie o PDF do boleto ou da nota fiscal (NFS-e) — se o sistema achar um título pendente que parece ser o complemento (NF ↔ boleto) do mesmo cliente/valor, ele sugere juntar os dois num título só.</div>
       <div class="row">
         <div class="field"><label>Arquivo PDF</label><input type="file" id="receberPdfFile" accept=".pdf" onchange="handleReceberPdfFile(event)"></div>
       </div>
@@ -565,7 +626,7 @@
       </div>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>Nº NF</th><th>Cliente</th><th>Emissão</th><th>Valor</th><th>Forma de pagamento</th><th>Documento de pagamento</th><th>Vencimento</th><th>Status</th></tr></thead>
+          <thead><tr><th>Nº NF</th><th>Cliente</th><th>Emissão</th><th>Valor</th><th>Forma de pagamento</th><th>Documento de pagamento</th><th>Vencimento</th><th>Status</th><th>PDFs</th></tr></thead>
           <tbody id="tblNotasFiscais"></tbody>
         </table>
       </div>
@@ -848,7 +909,7 @@ let state = {
   costCenters: [...DEFAULT_CC],
   serviceOrders: [],
   transactions: [], // {id, date:'YYYY-MM-DD', description, value(+/-), costCenter, serviceOrder, source, note, attachment:{name,type,dataUrl,size}|null}
-  receivables: [], // {id, cliente, tipo:'NF'|'Boleto'|'NF+Boleto'|..., formaPagamento:'Boleto'|'PIX'|'TED'|'Outro', numero (nº da NF quando tipo inclui NF, senão nº do boleto), numeroBoleto (nº do boleto quando o título é NF+Boleto), nossoNumero (nº interno do banco, do relatório Sicredi), dataEmissao, vencimento, valor, serviceOrder, costCenter, note, status:'pendente'|'recebido'|'cancelado', dataRecebimento, linkedTxId}
+  receivables: [], // {id, cliente, tipo:'NF'|'Boleto'|'NF+Boleto'|..., formaPagamento:'Boleto'|'PIX'|'TED'|'À vista'|'Outro', numero (nº da NF quando tipo inclui NF, senão nº do boleto), numeroBoleto (nº do boleto quando o título é NF+Boleto), nossoNumero (nº interno do banco, do relatório Sicredi), dataEmissao, vencimento, valor, parcela ('1/3' quando a NF foi dividida em mais de um boleto, senão ''), nfGroupId (compartilhado entre as parcelas da mesma NF), anexoNF/anexoBoleto (PDF guardado, ver construirAnexo/abrirAnexo), serviceOrder, costCenter, note, status:'pendente'|'recebido'|'cancelado', dataRecebimento, linkedTxId}
   payables: [], // {id, descricao, vencimento, valor, costCenter, serviceOrder, note, status:'pendente'|'pago', dataPagamento, linkedTxId}
   partners: [], // ['Alex','Bruno/Jessica']
   partnerPayments: [], // {id, date, partner, tipo:'pro-labore'|'distribuicao', value, note}
@@ -2340,16 +2401,20 @@ function renderReceivables(){
     const acoes = r.status==='pendente'
       ? `<button class="btn secondary small" onclick="markReceived('${r.id}')">Marcar recebido</button>`
       : '';
+    const anexos = [
+      r.anexoNF ? `<button class="btn secondary small" onclick="abrirAnexoReceivable('${r.id}','NF')">📄 NF</button>` : '',
+      r.anexoBoleto ? `<button class="btn secondary small" onclick="abrirAnexoReceivable('${r.id}','Boleto')">📄 Boleto</button>` : ''
+    ].filter(Boolean).join(" ") || '<span class="note">—</span>';
     return `<tr>
       <td>${escapeHtml(r.cliente)}</td>
-      <td>${r.tipo}${r.numero? ' nº '+escapeHtml(r.numero):''}${r.nossoNumero?`<br><span class="badge-source">Nosso Nº ${escapeHtml(r.nossoNumero)}</span>`:''}</td>
+      <td>${r.tipo}${r.numero? ' nº '+escapeHtml(r.numero):''}${r.parcela?`<br><span class="badge-source">Parcela ${escapeHtml(r.parcela)}</span>`:''}${r.nossoNumero?`<br><span class="badge-source">Nosso Nº ${escapeHtml(r.nossoNumero)}</span>`:''}</td>
       <td>${escapeHtml(r.formaPagamento||'—')}</td>
       <td>${fmtDateBR(r.dataEmissao)}</td>
       <td>${fmtDateBR(r.vencimento)}</td>
       <td class="val-pos">${fmtBRL(r.valor)}</td>
       <td>${r.serviceOrder || '—'}</td>
       <td>${statusPill}</td>
-      <td><div class="acoes-cell">${acoes}<span class="tag-remove" onclick="deleteReceivable('${r.id}')">✕</span></div></td>
+      <td><div class="acoes-cell">${anexos} ${acoes}<span class="tag-remove" onclick="deleteReceivable('${r.id}')">✕</span></div></td>
     </tr>`;
   }).join("") : `<tr><td colspan="9" class="empty">${todos.length ? 'Nenhum título nessa situação.' : 'Nenhum boleto/NF registrado ainda.'}</td></tr>`;
   document.getElementById("resumoReceivables").innerHTML =
@@ -2398,8 +2463,12 @@ function renderNotasFiscais(){
       ? `<span class="pill" style="background:#eee;color:#888">Cancelado</span>`
       : vencido ? `<span class="pill red">Vencido</span>` : `<span class="pill" style="background:#fff3e0;color:#b8720a">Pendente</span>`;
     const docPagamento = r.tipo==='NF+Boleto'
-      ? `Boleto${r.numeroBoleto? ' nº '+escapeHtml(r.numeroBoleto) : (r.nossoNumero? ' (Nosso Nº '+escapeHtml(r.nossoNumero)+')' : '')}`
+      ? `Boleto${r.numeroBoleto? ' nº '+escapeHtml(r.numeroBoleto) : (r.nossoNumero? ' (Nosso Nº '+escapeHtml(r.nossoNumero)+')' : '')}${r.parcela?` <span class="badge-source">Parcela ${escapeHtml(r.parcela)}</span>`:''}`
       : `<span class="note">Só NF, sem boleto vinculado ainda</span>`;
+    const anexos = [
+      r.anexoNF ? `<button class="btn secondary small" onclick="abrirAnexoReceivable('${r.id}','NF')">📄 NF</button>` : '',
+      r.anexoBoleto ? `<button class="btn secondary small" onclick="abrirAnexoReceivable('${r.id}','Boleto')">📄 Boleto</button>` : ''
+    ].filter(Boolean).join(" ") || '<span class="note">—</span>';
     return `<tr>
       <td>${r.numero? escapeHtml(r.numero) : '—'}</td>
       <td>${escapeHtml(r.cliente)}</td>
@@ -2409,8 +2478,9 @@ function renderNotasFiscais(){
       <td>${docPagamento}</td>
       <td>${fmtDateBR(r.vencimento)}</td>
       <td>${statusPill}</td>
+      <td>${anexos}</td>
     </tr>`;
-  }).join("") : `<tr><td colspan="8" class="empty">${notas.length ? 'Nenhuma NF encontrada com esses filtros.' : 'Nenhuma NF emitida registrada ainda (lance pela aba Boletos/NF a receber).'}</td></tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">${notas.length ? 'Nenhuma NF encontrada com esses filtros.' : 'Nenhuma NF emitida registrada ainda (envie o PDF da nota na aba Boletos/NF a receber).'}</td></tr>`;
   document.getElementById("resumoNotasFiscais").innerHTML = `${items.length} nota(s) — total: <b>${fmtBRL(total)}</b>`;
 }
 // Usado para evitar lançar o mesmo boleto/NF duas vezes (ex: uma vez manual/PDF e depois de
@@ -3751,6 +3821,37 @@ function extrairDadosDANFSe(items){
     valor: isNaN(valor) ? "" : valor
   };
 }
+// Extrai cliente/número/emissão/valor de um PDF de NF, usando a leitura por posição (DANFSe
+// nacional) quando reconhecida, ou busca de texto genérica (rótulo seguido do valor) nos outros
+// casos. Usada tanto no importador avulso (que ainda tenta distinguir NF de boleto) quanto no
+// fluxo guiado de "Nova nota fiscal", que trata o PDF enviado sempre como sendo a NF.
+function extrairDadosNF(items, linhas, isDANFSeConhecido){
+  const isDANFSe = isDANFSeConhecido!==undefined ? isDANFSeConhecido : ehDANFSeNacional(linhas);
+  if(isDANFSe) return extrairDadosDANFSe(items);
+
+  let clienteTexto = buscarCampoEmLinhas(linhas, [
+    "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
+    "Nome do Pagador","Pagador","Sacado"
+  ]);
+  // Boletos costumam trazer o CNPJ/CPF colado no nome, ex: "Empresa X - 12345678000190".
+  // Tira esse final só quando ele bate com um CNPJ/CPF (11 ou 14 dígitos), pra não cortar
+  // nomes de cliente que legitimamente terminem com números.
+  clienteTexto = clienteTexto.replace(/\s*-\s*\d{11}(\d{3})?$/,"").trim();
+  const numeroTexto = buscarCampoEmLinhas(linhas, [
+    "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota"
+  ]);
+  const numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
+  const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
+    "Data e Hora de Emiss[ãa]o","Data de Emiss[ãa]o","Emiss[ãa]o"
+  ]);
+  const dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
+  const valorTexto = buscarCampoEmLinhas(linhas, [
+    "Valor L[íi]quido da Nota","Valor Total da Nota","Valor Total do Servi[çc]o","Valor dos Servi[çc]os","Valor Total"
+  ]);
+  const valorNFMatch = valorTexto.match(/[\d.,]+/);
+  const valor = valorNFMatch ? parseBRNumber(valorNFMatch[0]) : NaN;
+  return { cliente: clienteTexto||"", numero: numero||"", dataEmissao, valor: isNaN(valor)?"":valor };
+}
 function decodeLinhaDigitavel(textoCompleto){
   const t = textoCompleto.replace(/[\r\n]+/g," ");
   let digits = null;
@@ -3816,36 +3917,11 @@ async function handleReceberPdfFile(evt){
     // nesse caso dá falso positivo, então só tentamos quando não é uma DANFSe reconhecida.
     const boleto = isDANFSe ? null : decodeLinhaDigitavel(textoCompleto);
 
-    let clienteTexto = "", numero = "", dataEmissao = "", valorNF = NaN;
-    if(isDANFSe){
-      const dadosDANFSe = extrairDadosDANFSe(items);
-      clienteTexto = dadosDANFSe.cliente;
-      numero = dadosDANFSe.numero;
-      dataEmissao = dadosDANFSe.dataEmissao;
-      valorNF = dadosDANFSe.valor===""?NaN:dadosDANFSe.valor;
-    } else {
-      clienteTexto = buscarCampoEmLinhas(linhas, [
-        "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
-        "Nome do Pagador","Pagador","Sacado"
-      ]);
-      // Boletos costumam trazer o CNPJ/CPF colado no nome, ex: "Empresa X - 12345678000190".
-      // Tira esse final só quando ele bate com um CNPJ/CPF (11 ou 14 dígitos), pra não cortar
-      // nomes de cliente que legitimamente terminem com números.
-      clienteTexto = clienteTexto.replace(/\s*-\s*\d{11}(\d{3})?$/,"").trim();
-      const numeroTexto = buscarCampoEmLinhas(linhas, [
-        "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota"
-      ]);
-      numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
-      const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
-        "Data e Hora de Emiss[ãa]o","Data de Emiss[ãa]o","Emiss[ãa]o"
-      ]);
-      dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
-      const valorTexto = buscarCampoEmLinhas(linhas, [
-        "Valor L[íi]quido da Nota","Valor Total da Nota","Valor Total do Servi[çc]o","Valor dos Servi[çc]os","Valor Total"
-      ]);
-      const valorNFMatch = valorTexto.match(/[\d.,]+/);
-      valorNF = valorNFMatch ? parseBRNumber(valorNFMatch[0]) : NaN;
-    }
+    const dadosNF = extrairDadosNF(items, linhas, isDANFSe);
+    const clienteTexto = dadosNF.cliente;
+    const numero = dadosNF.numero;
+    const dataEmissao = dadosNF.dataEmissao;
+    const valorNF = dadosNF.valor===""?NaN:dadosNF.valor;
 
     const temBoleto = !!boleto;
     // Não usamos clienteTexto aqui: tanto boleto (rótulo "Pagador") quanto NF (rótulo "Tomador")
@@ -3987,6 +4063,211 @@ function confirmarReceberConferencia(){
   renderReceivables();
 }
 
+/* ==================== NOVA NOTA FISCAL (fluxo guiado: NF -> forma de pagamento -> boleto[s]) ==================== */
+// Guarda os dados da NF (já lida e com o PDF salvo como anexo) enquanto a conferência está
+// aberta. É zerado ao confirmar ou cancelar.
+let nfWizard = null;
+
+async function handleNfPdfFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("nfPdfStatus");
+  statusEl.textContent = "Lendo e guardando o PDF da nota fiscal...";
+  try{
+    const items = await extrairItensPDF(file);
+    const linhas = agruparItensEmLinhas(items);
+    const dadosNF = extrairDadosNF(items, linhas);
+    const anexoNF = await construirAnexo(file, `NF ${dadosNF.numero||''} ${dadosNF.cliente||''}`.trim(), dadosNF.dataEmissao || todayStr());
+    nfWizard = {
+      anexoNF,
+      cliente: dadosNF.cliente || "",
+      numero: dadosNF.numero || "",
+      dataEmissao: dadosNF.dataEmissao || "",
+      valor: dadosNF.valor,
+      formaPagamento: "",
+      parcelas: []
+    };
+    abrirNfConferencia();
+    const faltando = [];
+    if(!dadosNF.cliente) faltando.push("cliente");
+    if(dadosNF.valor==="" || dadosNF.valor===undefined || isNaN(dadosNF.valor)) faltando.push("valor");
+    statusEl.textContent = faltando.length
+      ? `PDF lido e guardado. Não consegui identificar: ${faltando.join(", ")} — complete na conferência abaixo.`
+      : "PDF lido e guardado com sucesso. Revise os dados e escolha a forma de pagamento.";
+  }catch(err){
+    statusEl.textContent = "Erro ao importar o PDF da nota: " + err.message;
+  }
+  evt.target.value = "";
+}
+function abrirNfConferencia(){
+  document.getElementById("nfConfCliente").value = nfWizard.cliente;
+  document.getElementById("nfConfNumero").value = nfWizard.numero;
+  document.getElementById("nfConfEmissao").value = nfWizard.dataEmissao;
+  document.getElementById("nfConfValor").value = (nfWizard.valor!==undefined && nfWizard.valor!=="" && !isNaN(nfWizard.valor)) ? nfWizard.valor : "";
+  document.getElementById("nfConfNota").value = "";
+  fillOSSelects(); fillCCSelects();
+  document.getElementById("nfConfOS").value = "";
+  document.getElementById("nfConfCC").value = "";
+  document.getElementById("nfConfFormaPagamento").value = "";
+  document.getElementById("nfConfBoletoArea").style.display = "none";
+  document.getElementById("nfConfVencimentoArea").style.display = "none";
+  document.getElementById("nfConfVencimentoUnico").value = "";
+  document.getElementById("nfBoletoPdfStatus").textContent = "";
+  document.getElementById("nfBoletoPdfFile").value = "";
+  renderParcelasNF();
+  document.getElementById("nfConferenciaCard").style.display = "block";
+  irParaAba("conferencias");
+}
+function mudarFormaPagamentoNF(){
+  const forma = document.getElementById("nfConfFormaPagamento").value;
+  if(nfWizard) nfWizard.formaPagamento = forma;
+  document.getElementById("nfConfBoletoArea").style.display = forma==="Boleto" ? "block" : "none";
+  document.getElementById("nfConfVencimentoArea").style.display = (forma && forma!=="Boleto") ? "block" : "none";
+}
+async function handleNfBoletoPdfFile(evt){
+  const files = Array.from(evt.target.files||[]);
+  if(!files.length || !nfWizard) return;
+  const statusEl = document.getElementById("nfBoletoPdfStatus");
+  statusEl.textContent = `Lendo ${files.length} PDF(s) de boleto...`;
+  let okCount = 0;
+  const falhas = [];
+  for(const file of files){
+    try{
+      const items = await extrairItensPDF(file);
+      const linhas = agruparItensEmLinhas(items);
+      const textoCompleto = linhas.join("\n");
+      const boleto = decodeLinhaDigitavel(textoCompleto);
+      const numeroBoletoTexto = buscarCampoEmLinhas(linhas, [
+        "Nosso N[úu]mero","N[úu]mero do Documento","N[ºo]\\.?\\s*do Documento"
+      ]);
+      const numeroBoleto = (numeroBoletoTexto.match(/[\d./-]+/)||[""])[0];
+      const anexoBoleto = await construirAnexo(file, `Boleto ${numeroBoleto||''} ${nfWizard.cliente||''}`.trim(), (boleto&&boleto.vencimento)||todayStr());
+      nfWizard.parcelas.push({
+        numeroBoleto: numeroBoleto || "",
+        valor: boleto ? boleto.valor : "",
+        vencimento: boleto ? boleto.vencimento : "",
+        anexoBoleto
+      });
+      if(boleto) okCount++; else falhas.push(file.name);
+    }catch(err){
+      falhas.push(`${file.name} (${err.message})`);
+    }
+  }
+  renderParcelasNF();
+  statusEl.textContent = falhas.length
+    ? `${okCount} boleto(s) lido(s) com sucesso. Não consegui ler automaticamente: ${falhas.join(", ")} — complete manualmente na tabela abaixo.`
+    : `${okCount} boleto(s) lido(s) e guardado(s) com sucesso. Revise os valores e vencimentos abaixo antes de confirmar.`;
+  evt.target.value = "";
+}
+function renderParcelasNF(){
+  const tbody = document.getElementById("tblNfParcelas");
+  if(!nfWizard){ tbody.innerHTML = ""; return; }
+  const n = nfWizard.parcelas.length;
+  tbody.innerHTML = n ? nfWizard.parcelas.map((p,i)=>`
+    <tr>
+      <td>${i+1}/${n}</td>
+      <td><input type="text" class="small-input" value="${escapeHtml(p.numeroBoleto||'')}" oninput="atualizarParcelaNF(${i},'numeroBoleto',this.value)"></td>
+      <td><input type="number" step="0.01" class="small-input" value="${(p.valor!==''&&p.valor!==undefined&&!isNaN(p.valor))?p.valor:''}" oninput="atualizarParcelaNF(${i},'valor',this.value)"></td>
+      <td><input type="date" value="${p.vencimento||''}" onchange="atualizarParcelaNF(${i},'vencimento',this.value)"></td>
+      <td>${p.anexoBoleto ? '📎' : '—'}</td>
+      <td><span class="tag-remove" title="Remover parcela" onclick="removerParcelaNF(${i})">✕</span></td>
+    </tr>`).join("") : `<tr><td colspan="6" class="empty">Nenhuma parcela ainda — envie o(s) PDF(s) do boleto ou adicione uma parcela manualmente.</td></tr>`;
+}
+function atualizarParcelaNF(i, campo, valor){
+  if(!nfWizard || !nfWizard.parcelas[i]) return;
+  nfWizard.parcelas[i][campo] = campo==="valor" ? parseFloat(valor) : valor;
+}
+function removerParcelaNF(i){
+  if(!nfWizard) return;
+  nfWizard.parcelas.splice(i,1);
+  renderParcelasNF();
+}
+function adicionarParcelaManualNF(){
+  if(!nfWizard) return;
+  nfWizard.parcelas.push({numeroBoleto:"", valor:"", vencimento:"", anexoBoleto:null});
+  renderParcelasNF();
+}
+function cancelarNfConferencia(){
+  nfWizard = null;
+  document.getElementById("nfConferenciaCard").style.display = "none";
+  document.getElementById("nfPdfFile").value = "";
+  document.getElementById("nfPdfStatus").textContent = "";
+  renderConferenciasPendentes();
+}
+function confirmarNfConferencia(){
+  if(!nfWizard) return;
+  const cliente = document.getElementById("nfConfCliente").value.trim();
+  const numero = document.getElementById("nfConfNumero").value.trim();
+  const dataEmissao = document.getElementById("nfConfEmissao").value;
+  const valorTotal = parseFloat(document.getElementById("nfConfValor").value);
+  const os = document.getElementById("nfConfOS").value;
+  const cc = document.getElementById("nfConfCC").value;
+  const nota = document.getElementById("nfConfNota").value.trim();
+  const formaPagamento = document.getElementById("nfConfFormaPagamento").value;
+
+  if(!cliente){ alert("Preencha o cliente."); return; }
+  if(isNaN(valorTotal)){ alert("Preencha o valor da nota."); return; }
+  if(!formaPagamento){ alert("Selecione a forma de pagamento."); return; }
+
+  const nfGroupId = uid();
+  const anexoNF = nfWizard.anexoNF;
+
+  if(formaPagamento === "Boleto"){
+    if(!nfWizard.parcelas.length){ alert("Envie ao menos um PDF de boleto, ou adicione uma parcela manualmente."); return; }
+    for(const p of nfWizard.parcelas){
+      if(!p.vencimento || p.valor===""||p.valor===undefined||isNaN(p.valor)){
+        alert("Tem parcela sem vencimento ou sem valor preenchido. Complete antes de confirmar.");
+        return;
+      }
+    }
+    const n = nfWizard.parcelas.length;
+    nfWizard.parcelas.forEach((p,i)=>{
+      const dup = encontrarPossivelDuplicadoReceivable(cliente, p.vencimento, p.valor, null);
+      if(dup && !confirm(`Já existe um título parecido pra parcela ${i+1}/${n}: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar essa parcela mesmo assim?`)) return;
+      state.receivables.push({
+        id: uid(), cliente, tipo: "NF+Boleto", formaPagamento,
+        numero, numeroBoleto: p.numeroBoleto||"", nossoNumero: "",
+        dataEmissao, vencimento: p.vencimento, valor: p.valor,
+        parcela: n>1 ? `${i+1}/${n}` : "",
+        anexoNF, anexoBoleto: p.anexoBoleto||null, nfGroupId,
+        serviceOrder: os, costCenter: cc, note: nota,
+        status: "pendente", dataRecebimento: "", linkedTxId: null
+      });
+    });
+  } else {
+    const vencimento = document.getElementById("nfConfVencimentoUnico").value;
+    if(!vencimento){ alert("Preencha o vencimento."); return; }
+    const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valorTotal, null);
+    if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
+    state.receivables.push({
+      id: uid(), cliente, tipo: "NF", formaPagamento,
+      numero, numeroBoleto: "", nossoNumero: "",
+      dataEmissao, vencimento, valor: valorTotal,
+      parcela: "",
+      anexoNF, anexoBoleto: null, nfGroupId,
+      serviceOrder: os, costCenter: cc, note: nota,
+      status: "pendente", dataRecebimento: "", linkedTxId: null
+    });
+  }
+
+  saveState();
+  toast("Nota fiscal registrada com sucesso.");
+  nfWizard = null;
+  document.getElementById("nfConferenciaCard").style.display = "none";
+  document.getElementById("nfPdfFile").value = "";
+  document.getElementById("nfPdfStatus").textContent = "";
+  renderConferenciasPendentes();
+  renderReceivables();
+  renderNotasFiscais();
+}
+function abrirAnexoReceivable(id, qual){
+  const r = state.receivables.find(x=>x.id===id);
+  if(!r) return;
+  const anexo = qual==='NF' ? r.anexoNF : r.anexoBoleto;
+  if(!anexo){ alert("Não há PDF salvo pra esse documento."); return; }
+  abrirAnexo(anexo);
+}
+
 /* ==================== CONFERÊNCIAS (aba única) ==================== */
 function marcarRevisado(id){
   const t = state.transactions.find(x=>x.id===id);
@@ -4001,6 +4282,7 @@ function renderConferenciasPendentes(){
   const conferenciaAberta = document.getElementById("conferenciaCard").style.display !== "none";
   const estoqueAberta = document.getElementById("estoqueConferenciaCard").style.display !== "none";
   const receberAberta = document.getElementById("receberConferenciaCard").style.display !== "none";
+  const nfAberta = document.getElementById("nfConferenciaCard").style.display !== "none";
   const pendentesRevisao = state.transactions.filter(t=>t.revisar);
 
   const revisaoCard = document.getElementById("revisaoCard");
@@ -4019,7 +4301,7 @@ function renderConferenciasPendentes(){
     revisaoCard.style.display = "none";
   }
 
-  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + pendentesRevisao.length;
+  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + (nfAberta?1:0) + pendentesRevisao.length;
   const vazio = document.getElementById("conferenciasVazio");
   vazio.style.display = totalPendencias===0 ? "block" : "none";
 
