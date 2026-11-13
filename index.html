@@ -3412,7 +3412,7 @@ function confirmarEntradasEstoque(){
 }
 
 /* ==================== IMPORTAÇÃO DE BOLETO/NF (PDF) ==================== */
-async function extrairTextoPDFPorLinhas(file){
+async function extrairItensPDF(file){
   if(!window.pdfjsLib) throw new Error("Leitor de PDF não carregou (verifique sua conexão com a internet) e tente novamente.");
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
@@ -3426,9 +3426,12 @@ async function extrairTextoPDFPorLinhas(file){
     });
   }
   allItems.sort((a,b)=> a.page-b.page || b.y-a.y || a.x-b.x);
+  return allItems;
+}
+function agruparItensEmLinhas(items){
   const linhas = [];
   let atual = null;
-  allItems.forEach(it=>{
+  items.forEach(it=>{
     if(atual && atual.page===it.page && Math.abs(atual.y-it.y)<3){
       atual.str += " " + it.str;
     } else {
@@ -3437,6 +3440,65 @@ async function extrairTextoPDFPorLinhas(file){
     }
   });
   return linhas.map(l=>l.str.replace(/\s+/g," ").trim());
+}
+async function extrairTextoPDFPorLinhas(file){
+  const items = await extrairItensPDF(file);
+  return agruparItensEmLinhas(items);
+}
+// Busca, dentro de uma lista de itens posicionados (x,y), o item cujo texto bate com rotuloRegex
+// e retorna o texto do item que está logo abaixo dele, na mesma coluna (x parecido).
+// Usado para ler formulários em grade (como o DANFSe nacional), onde cada campo é um rótulo
+// seguido do valor na linha de baixo, na mesma posição horizontal.
+function valorAbaixoDoRotulo(items, rotuloRegex, opts){
+  opts = opts || {};
+  const xTol = opts.xTol!==undefined ? opts.xTol : 18;
+  const yMaxGap = opts.yMaxGap!==undefined ? opts.yMaxGap : 16;
+  const rotulos = items.filter(it=> rotuloRegex.test(it.str));
+  if(!rotulos.length) return "";
+  const rotulo = rotulos.sort((a,b)=> b.y-a.y)[0];
+  const candidatos = items.filter(it=>
+    it.page===rotulo.page && Math.abs(it.x-rotulo.x)<=xTol && it.y<rotulo.y && it.y>(rotulo.y-yMaxGap)
+  );
+  if(!candidatos.length) return "";
+  candidatos.sort((a,b)=> b.y-a.y);
+  return candidatos[0].str.trim();
+}
+// Recorta o subconjunto de itens entre um marcador de início e o próximo marcador de fim
+// (ex: tudo dentro do bloco "TOMADOR / ADQUIRENTE", antes do bloco seguinte).
+function faixaEntreMarcadores(items, inicioRegex, fimRegex){
+  const inicio = items.find(it=> inicioRegex.test(it.str));
+  if(!inicio) return null;
+  const fins = items.filter(it=> it.page===inicio.page && fimRegex.test(it.str) && it.y<inicio.y);
+  const yBottom = fins.length ? Math.max(...fins.map(it=>it.y)) : -Infinity;
+  return items.filter(it=> it.page===inicio.page && it.y<=inicio.y && it.y>yBottom);
+}
+// Padrão nacional de NFS-e (DANFSe v2.0) — layout de formulário em grade, igual em qualquer
+// prefeitura que já adotou o padrão nacional. Quando reconhecido, a leitura é bem confiável
+// porque usamos a posição exata de cada campo, não só busca de texto.
+function ehDANFSeNacional(linhas){
+  return linhas.some(l=> /DANFSe|Documento Auxiliar da NFS-?e/i.test(l));
+}
+function extrairDadosDANFSe(items){
+  const numero = valorAbaixoDoRotulo(items, /^N[ÚU]MERO DA NFS-?e$/i);
+  const dataEmissaoTexto = valorAbaixoDoRotulo(items, /^DATA E HORA DA EMISS[ÃA]O DA NFS-?e$/i);
+  const dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
+
+  const faixaTomador = faixaEntreMarcadores(items,
+    /^TOMADOR\s*\/\s*ADQUIRENTE$/i,
+    /^(DESTINAT[ÁA]RIO|INTERMEDI[ÁA]RIO|SERVI[ÇC]O PRESTADO)/i
+  );
+  const cliente = faixaTomador ? valorAbaixoDoRotulo(faixaTomador, /^Nome\s*\/\s*Nome Empresarial$/i) : "";
+
+  let valorTexto = valorAbaixoDoRotulo(items, /^VALOR\s+L[ÍI]QUIDO\s+DA\s+NFS-?e$/i);
+  if(!valorTexto) valorTexto = valorAbaixoDoRotulo(items, /^VALOR\s+DA\s+OPERA[ÇC][ÃA]O\s*\/\s*SERVI[ÇC]O$/i);
+  const valor = valorTexto ? parseBRNumber(valorTexto) : NaN;
+
+  return {
+    cliente: cliente || "",
+    numero: numero || "",
+    dataEmissao,
+    valor: isNaN(valor) ? "" : valor
+  };
 }
 function decodeLinhaDigitavel(textoCompleto){
   const t = textoCompleto.replace(/[\r\n]+/g," ");
@@ -3477,31 +3539,46 @@ async function handleReceberPdfFile(evt){
   const statusEl = document.getElementById("receberPdfStatus");
   statusEl.textContent = "Lendo PDF...";
   try{
-    const linhas = await extrairTextoPDFPorLinhas(file);
+    const items = await extrairItensPDF(file);
+    const linhas = agruparItensEmLinhas(items);
     const textoCompleto = linhas.join("\n");
     if(!textoCompleto.trim()){
       statusEl.textContent = "Não consegui ler texto neste PDF (pode ser uma imagem escaneada). Preencha manualmente na conferência abaixo.";
       openReceberConferencia({});
       return;
     }
-    const boleto = decodeLinhaDigitavel(textoCompleto);
-    const clienteTexto = buscarCampoEmLinhas(linhas, [
-      "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
-      "Nome do Pagador","Pagador","Sacado"
-    ]);
-    const numeroTexto = buscarCampoEmLinhas(linhas, [
-      "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota","Nosso N[úu]mero"
-    ]);
-    const numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
-    const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
-      "Data e Hora de Emiss[ãa]o","Data de Emiss[ãa]o","Emiss[ãa]o"
-    ]);
-    const dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
-    const valorTexto = buscarCampoEmLinhas(linhas, [
-      "Valor L[íi]quido da Nota","Valor Total da Nota","Valor Total do Servi[çc]o","Valor dos Servi[çc]os","Valor Total"
-    ]);
-    const valorNFMatch = valorTexto.match(/[\d.,]+/);
-    const valorNF = valorNFMatch ? parseBRNumber(valorNFMatch[0]) : NaN;
+    const isDANFSe = ehDANFSeNacional(linhas);
+    // A DANFSe (nota fiscal de serviço) não traz linha digitável de boleto — o número longo que
+    // aparece nela é a chave de acesso da nota, não um boleto. Tentar decodificar como boleto
+    // nesse caso dá falso positivo, então só tentamos quando não é uma DANFSe reconhecida.
+    const boleto = isDANFSe ? null : decodeLinhaDigitavel(textoCompleto);
+
+    let clienteTexto = "", numero = "", dataEmissao = "", valorNF = NaN;
+    if(isDANFSe){
+      const dadosDANFSe = extrairDadosDANFSe(items);
+      clienteTexto = dadosDANFSe.cliente;
+      numero = dadosDANFSe.numero;
+      dataEmissao = dadosDANFSe.dataEmissao;
+      valorNF = dadosDANFSe.valor===""?NaN:dadosDANFSe.valor;
+    } else {
+      clienteTexto = buscarCampoEmLinhas(linhas, [
+        "Tomador de Servi[çc]os","Nome\\s*/?\\s*Raz[ãa]o Social do Tomador","Tomador",
+        "Nome do Pagador","Pagador","Sacado"
+      ]);
+      const numeroTexto = buscarCampoEmLinhas(linhas, [
+        "N[úu]mero da NFS-?e","N[úu]mero da Nota Fiscal","N[úu]mero da Nota","N[ºo]\\.?\\s*da Nota","Nosso N[úu]mero"
+      ]);
+      numero = (numeroTexto.match(/[\d./-]+/)||[""])[0];
+      const dataEmissaoTexto = buscarCampoEmLinhas(linhas, [
+        "Data e Hora de Emiss[ãa]o","Data de Emiss[ãa]o","Emiss[ãa]o"
+      ]);
+      dataEmissao = parseDateFlexible((dataEmissaoTexto.match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]) || "";
+      const valorTexto = buscarCampoEmLinhas(linhas, [
+        "Valor L[íi]quido da Nota","Valor Total da Nota","Valor Total do Servi[çc]o","Valor dos Servi[çc]os","Valor Total"
+      ]);
+      const valorNFMatch = valorTexto.match(/[\d.,]+/);
+      valorNF = valorNFMatch ? parseBRNumber(valorNFMatch[0]) : NaN;
+    }
 
     const temBoleto = !!boleto;
     const temNF = !isNaN(valorNF) || !!numero || !!clienteTexto;
