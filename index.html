@@ -264,36 +264,6 @@
       </div>
     </div>
 
-    <div class="card" id="receberConferenciaCard" style="display:none;">
-      <div>
-        <h2>Conferência de boleto / NF importado</h2>
-        <div class="desc" id="receberConferenciaDesc">Revise os campos abaixo (alguns podem ter vindo em branco, dependendo do PDF) e complete o que faltar antes de confirmar.</div>
-        <div id="receberConferenciaVinculoArea" style="display:none;background:#e7f0fb;border:1px solid #b8d0ee;border-radius:8px;padding:10px;margin-bottom:10px;">
-          <div id="receberConferenciaVinculoTexto" style="margin-bottom:8px;"></div>
-          <button type="button" class="btn secondary small" onclick="vincularReceberAoComplemento()">🔗 Vincular a esse título (não criar novo)</button>
-          <button type="button" class="btn secondary small" onclick="desfazerVinculoReceber()">Criar título separado mesmo assim</button>
-        </div>
-        <div class="note" id="receberConferenciaAvisoDuplicado" style="display:none;color:#b8720a;font-weight:600;"></div>
-      </div>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:180px;"><label>Cliente</label><input type="text" id="recConfCliente" placeholder="Nome do cliente"></div>
-        <div class="field"><label>Tipo</label><select id="recConfTipo"><option value="Boleto">Boleto</option><option value="NF">NF</option><option value="NF+Boleto">NF + Boleto</option></select></div>
-        <div class="field"><label>Forma de pagamento</label><select id="recConfFormaPagamento"><option value="">— selecione —</option><option value="Boleto">Boleto</option><option value="PIX">PIX</option><option value="TED">TED</option><option value="Outro">Outro</option></select></div>
-        <div class="field"><label>Número</label><input type="text" id="recConfNumero" class="small-input" placeholder="Nº"></div>
-        <div class="field"><label>Emissão</label><input type="date" id="recConfEmissao"></div>
-        <div class="field"><label>Vencimento</label><input type="date" id="recConfVencimento"></div>
-        <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="recConfValor" class="small-input" placeholder="0,00"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>OS vinculada</label><select class="os-select-target" id="recConfOS"></select></div>
-        <div class="field"><label>Centro de custo</label><select class="cc-select-target" id="recConfCC"></select></div>
-        <div class="field" style="flex:1;min-width:200px;"><label>Observação</label><input type="text" id="recConfNota" placeholder="Opcional"></div>
-      </div>
-      <div style="margin-top:14px;">
-        <button class="btn" onclick="confirmarReceberConferencia()">Confirmar e registrar</button>
-        <button class="btn secondary" onclick="cancelarReceberConferencia()">Cancelar</button>
-      </div>
-    </div>
 
     <div class="card" id="nfConferenciaCard" style="display:none;">
       <div>
@@ -584,17 +554,8 @@
     </div>
 
     <div class="card">
-      <h2>Importar boleto ou NF avulso (PDF)</h2>
-      <div class="desc">Para os casos fora do fluxo guiado acima: um boleto que chegou separado (sem passar pela "Nova nota fiscal"), ou uma NF antiga pra registrar rápido. Envie o PDF do boleto ou da nota fiscal (NFS-e) — se o sistema achar um título pendente que parece ser o complemento (NF ↔ boleto) do mesmo cliente/valor, ele sugere juntar os dois num título só.</div>
-      <div class="row">
-        <div class="field"><label>Arquivo PDF</label><input type="file" id="receberPdfFile" accept=".pdf" onchange="handleReceberPdfFile(event)"></div>
-      </div>
-      <div class="note" id="receberPdfStatus"></div>
-    </div>
-
-    <div class="card">
       <h2>Importar relatório de boletos (Sicredi)</h2>
-      <div class="desc">Importe o "Relatório de Boletos" (.xls/.xlsx) direto do internet banking — ele adiciona os boletos novos e atualiza para "Recebido" os que já foram liquidados, sem duplicar. Pode importar o mesmo relatório de novo mais pra frente, só com os títulos atualizados.</div>
+      <div class="desc">Importe o "Relatório de Boletos" (.xls/.xlsx) direto do internet banking — ele serve só pra confirmar a situação dos boletos já cadastrados: atualiza para "Recebido" os que foram liquidados e para "Cancelado" os que foram baixados. Não cadastra boleto novo (isso é feito pela "Nova nota fiscal" ou pelo cadastro manual). Pode importar o mesmo relatório de novo mais pra frente, só com os títulos atualizados.</div>
       <input type="file" id="boletosReportFile" accept=".xls,.xlsx" onchange="handleBoletosReportFile(event)">
       <div class="note" id="boletosImportStatus"></div>
     </div>
@@ -2564,23 +2525,6 @@ function encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, exclud
     Math.abs(Math.abs(r.valor)-Math.abs(valor))<0.02
   ) || null;
 }
-// Quando a NF e o boleto do mesmo pagamento são importados em PDFs separados (comum: a
-// prefeitura manda a NF e o banco manda o boleto em arquivos diferentes), acha o título
-// pendente do tipo complementar (NF procura Boleto, e vice-versa) pra sugerir vincular os dois
-// num título só, em vez de criar dois registros separados pro mesmo pagamento.
-function encontrarComplementoParaVincular(cliente, tipoAtual, valor){
-  if(tipoAtual!=="NF" && tipoAtual!=="Boleto") return null;
-  const tipoAlvo = tipoAtual==="NF" ? "Boleto" : "NF";
-  const clienteNorm = normalizarTexto(cliente);
-  if(!clienteNorm || isNaN(valor)) return null;
-  const candidatos = state.receivables.filter(r=>
-    r.status==="pendente" &&
-    r.tipo===tipoAlvo &&
-    normalizarTexto(r.cliente)===clienteNorm &&
-    Math.abs(Math.abs(r.valor)-Math.abs(valor))<0.02
-  );
-  return candidatos.length===1 ? candidatos[0] : null;
-}
 function addReceivable(){
   const cliente = document.getElementById("recCliente").value.trim();
   const tipo = document.getElementById("recTipo").value;
@@ -2720,7 +2664,7 @@ async function handleBoletosReportFile(evt){
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:"", raw:false});
     const resultado = importarRelatorioBoletos(rows);
-    statusEl.textContent = `Relatório processado: ${resultado.novos} novo(s), ${resultado.atualizados} atualizado(s) para recebido, ${resultado.cancelados} cancelado(s), ${resultado.inalterados} já estavam em dia.`;
+    statusEl.textContent = `Relatório processado: ${resultado.atualizados} confirmado(s) como recebido, ${resultado.cancelados} cancelado(s), ${resultado.inalterados} já estavam em dia${resultado.naoEncontrados? `, ${resultado.naoEncontrados} não encontrado(s) no cadastro (ainda não foram lançados por aqui)`:''}.`;
     saveState();
     renderReceivables();
     renderPainel();
@@ -2755,7 +2699,7 @@ function importarRelatorioBoletos(rows){
     throw new Error("Não encontrei todas as colunas esperadas no relatório (Pagador, Vencimento, Valor).");
   }
 
-  let novos=0, atualizados=0, cancelados=0, inalterados=0;
+  let atualizados=0, cancelados=0, inalterados=0, naoEncontrados=0;
 
   for(let i=headerIdx+1;i<rows.length;i++){
     const r = rows[i];
@@ -2815,28 +2759,13 @@ function importarRelatorioBoletos(rows){
         inalterados++;
       }
     } else {
-      const novo = {
-        id: uid(), cliente, tipo: "Boleto", formaPagamento: "Boleto", numero, numeroBoleto:"", nossoNumero,
-        dataEmissao, vencimento, valor,
-        serviceOrder: "", costCenter: "",
-        note: "Importado do relatório de boletos (Sicredi).",
-        status: novoStatus, dataRecebimento: novoStatus==="recebido" ? vencimento : "",
-        linkedTxId: null
-      };
-      if(novoStatus === "recebido"){
-        const tx = {
-          id: uid(), date: vencimento, description: `Recebimento Boleto nº ${numero} — ${cliente}`,
-          value: Math.abs(valorRecebido), costCenter: "", serviceOrder: "",
-          source: "receivable", note: "", attachment: null
-        };
-        state.transactions.push(tx);
-        novo.linkedTxId = tx.id;
-      }
-      state.receivables.push(novo);
-      if(novoStatus === "cancelado") cancelados++; else novos++;
+      // O relatório da Sicredi só serve pra confirmar a situação de um boleto que já foi
+      // registrado por aqui (NF/boleto emitido) — não cria título novo sozinho. Se não achou
+      // correspondência, é porque esse boleto ainda não foi cadastrado (ou os dados não batem).
+      naoEncontrados++;
     }
   }
-  return {novos, atualizados, cancelados, inalterados};
+  return {atualizados, cancelados, inalterados, naoEncontrados};
 }
 
 /* ==================== CONTAS A PAGAR ==================== */
@@ -3981,174 +3910,6 @@ function buscarCampoEmLinhas(linhas, rotulos){
   }
   return "";
 }
-async function handleReceberPdfFile(evt){
-  const file = evt.target.files[0];
-  if(!file) return;
-  const statusEl = document.getElementById("receberPdfStatus");
-  statusEl.textContent = "Lendo PDF...";
-  try{
-    const items = await extrairItensPDF(file);
-    const linhas = agruparItensEmLinhas(items);
-    const textoCompleto = linhas.join("\n");
-    if(!textoCompleto.trim()){
-      statusEl.textContent = "Não consegui ler texto neste PDF (pode ser uma imagem escaneada). Preencha manualmente na conferência abaixo.";
-      openReceberConferencia({});
-      return;
-    }
-    const isDANFSe = ehDANFSeNacional(linhas);
-    // A DANFSe (nota fiscal de serviço) não traz linha digitável de boleto — o número longo que
-    // aparece nela é a chave de acesso da nota, não um boleto. Tentar decodificar como boleto
-    // nesse caso dá falso positivo, então só tentamos quando não é uma DANFSe reconhecida.
-    const boleto = isDANFSe ? null : decodeLinhaDigitavel(textoCompleto);
-
-    const dadosNF = extrairDadosNF(items, linhas, isDANFSe);
-    const clienteTexto = dadosNF.cliente;
-    const numero = dadosNF.numero;
-    const dataEmissao = dadosNF.dataEmissao;
-    const valorNF = dadosNF.valor===""?NaN:dadosNF.valor;
-
-    const temBoleto = !!boleto;
-    // Não usamos clienteTexto aqui: tanto boleto (rótulo "Pagador") quanto NF (rótulo "Tomador")
-    // preenchem esse campo, então ele não serve para diferenciar os dois tipos de documento.
-    const temNF = !isNaN(valorNF) || !!numero;
-    let tipo = "Boleto";
-    if(temBoleto && temNF) tipo = "NF+Boleto";
-    else if(!temBoleto && temNF) tipo = "NF";
-
-    const dados = {
-      cliente: clienteTexto || "",
-      tipo,
-      numero: numero || "",
-      dataEmissao: dataEmissao,
-      vencimento: (boleto && boleto.vencimento) || "",
-      valor: temBoleto ? boleto.valor : (isNaN(valorNF) ? "" : valorNF),
-    };
-    const faltando = [];
-    if(!dados.cliente) faltando.push("cliente");
-    if(!dados.vencimento) faltando.push("vencimento");
-    if(dados.valor==="" || dados.valor===undefined || isNaN(dados.valor)) faltando.push("valor");
-    statusEl.textContent = faltando.length
-      ? `PDF lido. Não consegui identificar: ${faltando.join(", ")} — complete na conferência abaixo.`
-      : "PDF lido com sucesso. Revise os dados abaixo antes de confirmar.";
-    openReceberConferencia(dados);
-  }catch(err){
-    statusEl.textContent = "Erro ao importar PDF: " + err.message;
-  }
-  evt.target.value = "";
-}
-function openReceberConferencia(dados){
-  document.getElementById("recConfCliente").value = dados.cliente || "";
-  document.getElementById("recConfTipo").value = dados.tipo || "Boleto";
-  document.getElementById("recConfFormaPagamento").value = (dados.tipo==="Boleto"||dados.tipo==="NF+Boleto") ? "Boleto" : "";
-  document.getElementById("recConfNumero").value = dados.numero || "";
-  document.getElementById("recConfEmissao").value = dados.dataEmissao || "";
-  document.getElementById("recConfVencimento").value = (dados.vencimento && dados.vencimento!=="") ? dados.vencimento : "";
-  document.getElementById("recConfValor").value = (dados.valor!==undefined && dados.valor!=="" && !isNaN(dados.valor)) ? dados.valor : "";
-  document.getElementById("recConfNota").value = "";
-  fillOSSelects(); fillCCSelects();
-  document.getElementById("recConfOS").value = "";
-  document.getElementById("recConfCC").value = "";
-  const valorNum = dados.valor!==undefined && dados.valor!=="" ? parseFloat(dados.valor) : NaN;
-
-  // Sugere vincular quando o tipo detectado é só NF ou só Boleto e existe um título pendente
-  // do tipo complementar pro mesmo cliente/valor (provavelmente o mesmo pagamento em 2 PDFs).
-  receberComplementoPendente = encontrarComplementoParaVincular(dados.cliente, dados.tipo, valorNum);
-  const vinculoArea = document.getElementById("receberConferenciaVinculoArea");
-  if(receberComplementoPendente){
-    const c = receberComplementoPendente;
-    vinculoArea.style.display = "block";
-    document.getElementById("receberConferenciaVinculoTexto").textContent =
-      `🔗 Encontrei um título pendente que parece ser o ${c.tipo==='NF'?'NF':'boleto'} correspondente a esse pagamento: ${c.cliente}, ${c.tipo}${c.numero?' nº '+c.numero:''}, ${fmtBRL(c.valor)}. Quer juntar os dois num título só?`;
-  } else {
-    vinculoArea.style.display = "none";
-  }
-
-  const avisoEl = document.getElementById("receberConferenciaAvisoDuplicado");
-  const dup = encontrarPossivelDuplicadoReceivable(dados.cliente, dados.vencimento, valorNum, null);
-  if(dup){
-    avisoEl.style.display = "block";
-    avisoEl.textContent = `⚠ Já existe um título parecido registrado: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Confira antes de confirmar pra não duplicar.`;
-  } else {
-    avisoEl.style.display = "none";
-    avisoEl.textContent = "";
-  }
-  document.getElementById("receberConferenciaCard").style.display = "block";
-  irParaAba("conferencias");
-}
-let receberComplementoPendente = null;
-function desfazerVinculoReceber(){
-  receberComplementoPendente = null;
-  document.getElementById("receberConferenciaVinculoArea").style.display = "none";
-}
-function vincularReceberAoComplemento(){
-  if(!receberComplementoPendente) return;
-  const c = receberComplementoPendente;
-  const numero = document.getElementById("recConfNumero").value.trim();
-  const dataEmissao = document.getElementById("recConfEmissao").value;
-  const vencimento = document.getElementById("recConfVencimento").value;
-  const formaPagamento = document.getElementById("recConfFormaPagamento").value;
-  const os = document.getElementById("recConfOS").value;
-  const cc = document.getElementById("recConfCC").value;
-  const nota = document.getElementById("recConfNota").value.trim();
-  const tipoAtual = document.getElementById("recConfTipo").value; // "NF" ou "Boleto"
-
-  if(tipoAtual==="NF"){
-    // este PDF é a NF; c é o boleto já existente
-    c.numeroBoleto = c.numero || c.numeroBoleto || "";
-    c.numero = numero || c.numero;
-    if(!c.dataEmissao) c.dataEmissao = dataEmissao;
-  } else {
-    // este PDF é o boleto; c é a NF já existente
-    c.numeroBoleto = numero || c.numeroBoleto || "";
-    if(!c.vencimento) c.vencimento = vencimento;
-  }
-  c.tipo = "NF+Boleto";
-  if(!c.formaPagamento) c.formaPagamento = formaPagamento || "Boleto";
-  if(os && !c.serviceOrder) c.serviceOrder = os;
-  if(cc && !c.costCenter) c.costCenter = cc;
-  if(nota) c.note = (c.note ? c.note+" — " : "") + nota;
-  saveState();
-  toast("NF e boleto vinculados num título só.");
-  receberComplementoPendente = null;
-  cancelarReceberConferencia();
-  document.getElementById("receberPdfFile").value = "";
-  document.getElementById("receberPdfStatus").textContent = "";
-  renderReceivables();
-  renderNotasFiscais();
-}
-function cancelarReceberConferencia(){
-  document.getElementById("receberConferenciaCard").style.display = "none";
-  renderConferenciasPendentes();
-}
-function confirmarReceberConferencia(){
-  const cliente = document.getElementById("recConfCliente").value.trim();
-  const tipo = document.getElementById("recConfTipo").value;
-  const formaPagamento = document.getElementById("recConfFormaPagamento").value;
-  const numero = document.getElementById("recConfNumero").value.trim();
-  const dataEmissao = document.getElementById("recConfEmissao").value;
-  const vencimento = document.getElementById("recConfVencimento").value;
-  const valor = parseFloat(document.getElementById("recConfValor").value);
-  const os = document.getElementById("recConfOS").value;
-  const cc = document.getElementById("recConfCC").value;
-  const nota = document.getElementById("recConfNota").value.trim();
-  if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor antes de confirmar."); return; }
-  // Toda NF emitida precisa ter a forma de pagamento registrada — sem isso não dá pra saber
-  // como ela vai ser recebida (não pode ficar uma NF "solta" sem meio de pagamento definido).
-  if((tipo==="NF" || tipo==="NF+Boleto") && !formaPagamento){ alert("Pra NF (ou NF + Boleto), é obrigatório informar a forma de pagamento."); return; }
-  const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
-  if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
-  state.receivables.push({
-    id: uid(), cliente, tipo, formaPagamento, numero, numeroBoleto:"", nossoNumero:"", dataEmissao, vencimento, valor,
-    serviceOrder: os, costCenter: cc, note: nota, status:"pendente", dataRecebimento:"", linkedTxId:null
-  });
-  saveState();
-  toast("Título registrado a partir do PDF.");
-  renderNotasFiscais();
-  cancelarReceberConferencia();
-  document.getElementById("receberPdfFile").value = "";
-  document.getElementById("receberPdfStatus").textContent = "";
-  renderReceivables();
-}
 
 /* ==================== NOVA NOTA FISCAL (fluxo guiado: NF -> forma de pagamento -> boleto[s]) ==================== */
 // Guarda os dados da NF (já lida e com o PDF salvo como anexo) enquanto a conferência está
@@ -4368,7 +4129,6 @@ function marcarRevisado(id){
 function renderConferenciasPendentes(){
   const conferenciaAberta = document.getElementById("conferenciaCard").style.display !== "none";
   const estoqueAberta = document.getElementById("estoqueConferenciaCard").style.display !== "none";
-  const receberAberta = document.getElementById("receberConferenciaCard").style.display !== "none";
   const nfAberta = document.getElementById("nfConferenciaCard").style.display !== "none";
   const pendentesRevisao = state.transactions.filter(t=>t.revisar);
 
@@ -4454,7 +4214,7 @@ function renderConferenciasPendentes(){
     revisaoCard.style.display = "none";
   }
 
-  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + (nfAberta?1:0) + nfsSemForma.length + pdfsFaltantes.length + pendentesRevisao.length;
+  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (nfAberta?1:0) + nfsSemForma.length + pdfsFaltantes.length + pendentesRevisao.length;
   const vazio = document.getElementById("conferenciasVazio");
   vazio.style.display = totalPendencias===0 ? "block" : "none";
 
