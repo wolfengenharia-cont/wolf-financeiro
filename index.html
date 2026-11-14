@@ -92,6 +92,21 @@
 </head>
 <body>
 
+<div id="loginOverlay" style="position:fixed;inset:0;background:#1b2838;z-index:9999;display:flex;align-items:center;justify-content:center;font-family:inherit;">
+  <div style="background:#fff;border-radius:10px;padding:32px 28px;width:280px;box-shadow:0 10px 30px rgba(0,0,0,0.3);text-align:center;">
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Wolf Financeiro</div>
+    <div style="font-size:12.5px;color:#777;margin-bottom:18px;">Digite a senha para entrar</div>
+    <input type="password" id="loginSenhaInput" placeholder="Senha" style="width:100%;padding:9px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box;margin-bottom:10px;" autofocus>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666;margin-bottom:12px;justify-content:center;">
+      <input type="checkbox" id="loginLembrar" checked style="margin:0;"> Lembrar neste computador
+    </label>
+    <button onclick="tentarLogin()" style="width:100%;padding:9px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Entrar</button>
+    <div id="loginErro" style="color:#c0392b;font-size:12px;margin-top:10px;min-height:14px;"></div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
 <header>
   <div>
     <h1>Wolf Financeiro</h1>
@@ -830,6 +845,8 @@
 
 <div class="toast" id="toast"></div>
 <input type="file" id="attachInput" style="display:none" onchange="handleAttachmentSelected(event)">
+
+</div>
 
 <script>
 /* ==================== ESTADO / PERSISTÊNCIA ==================== */
@@ -4270,10 +4287,61 @@ function renderAll(){
   renderConferenciasPendentes();
 }
 
-loadState();
-processarTodasRecorrencias(true);
-renderAll();
-initAnexosDir();
+/* ==================== LOGIN (tela de senha) ==================== */
+const LOGIN_HASH = "826657d453930dfe0f6dcfb9fec5614341de3afff01e1890e28918c93359e1ba";
+const LOGIN_STORAGE_KEY = "wolfFinanceiroAuthOk_v1";
+
+async function sha256Hex(texto){
+  const buf = new TextEncoder().encode(texto);
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function iniciarApp(){
+  document.getElementById("loginOverlay").style.display = "none";
+  document.getElementById("appRoot").style.display = "";
+  loadState();
+  processarTodasRecorrencias(true);
+  renderAll();
+  initAnexosDir();
+}
+
+async function tentarLogin(){
+  const input = document.getElementById("loginSenhaInput");
+  const erroEl = document.getElementById("loginErro");
+  const valor = input.value;
+  let hash;
+  try{
+    hash = await sha256Hex(valor);
+  }catch(e){
+    erroEl.textContent = "Não foi possível verificar a senha neste navegador.";
+    return;
+  }
+  if(hash === LOGIN_HASH){
+    if(document.getElementById("loginLembrar").checked){
+      try{ localStorage.setItem(LOGIN_STORAGE_KEY, LOGIN_HASH); }catch(e){}
+    }
+    iniciarApp();
+  } else {
+    erroEl.textContent = "Senha incorreta.";
+    input.value = "";
+    input.focus();
+  }
+}
+
+document.getElementById("loginSenhaInput").addEventListener("keydown", function(e){
+  if(e.key === "Enter") tentarLogin();
+});
+
+(async function verificarLoginSalvo(){
+  let salvo = null;
+  try{ salvo = localStorage.getItem(LOGIN_STORAGE_KEY); }catch(e){}
+  if(salvo && salvo === LOGIN_HASH){
+    iniciarApp();
+  } else {
+    document.getElementById("loginSenhaInput").focus();
+  }
+})();
 </script>
 </body>
 </html>
