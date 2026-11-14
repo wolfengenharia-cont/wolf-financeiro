@@ -347,6 +347,17 @@
       </div>
     </div>
 
+    <div class="card" id="nfSemFormaCard" style="display:none;">
+      <h2>Notas fiscais sem forma de pagamento</h2>
+      <div class="desc">Não pode haver NF emitida sem forma de pagamento cadastrada. Escolha a forma de pagamento de cada uma abaixo e salve.</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Cliente</th><th>Nº NF</th><th>Emissão</th><th>Vencimento</th><th>Valor</th><th>Forma de pagamento</th><th></th></tr></thead>
+          <tbody id="tblNfSemForma"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card" id="revisaoCard" style="display:none;">
       <h2>Lançamentos marcados para revisão</h2>
       <div class="desc">Lançamentos que foram confirmados mesmo com algum problema (sem OS obrigatória, sem data/descrição, saldo do extrato não batendo etc). Corrija o que for preciso e marque como revisado.</div>
@@ -2449,7 +2460,7 @@ function renderReceivables(){
     return `<tr>
       <td>${escapeHtml(r.cliente)}</td>
       <td>${r.tipo}${r.numero? ' nº '+escapeHtml(r.numero):''}${r.parcela?`<br><span class="badge-source">Parcela ${escapeHtml(r.parcela)}</span>`:''}${r.nossoNumero?`<br><span class="badge-source">Nosso Nº ${escapeHtml(r.nossoNumero)}</span>`:''}</td>
-      <td>${escapeHtml(r.formaPagamento||'—')}</td>
+      <td>${r.formaPagamento ? escapeHtml(r.formaPagamento) : ((r.tipo==='NF'||r.tipo==='NF+Boleto') ? '<span class="pill red">⚠ sem forma</span>' : '—')}</td>
       <td>${fmtDateBR(r.dataEmissao)}</td>
       <td>${fmtDateBR(r.vencimento)}</td>
       <td class="val-pos">${fmtBRL(r.valor)}</td>
@@ -2515,7 +2526,7 @@ function renderNotasFiscais(){
       <td>${escapeHtml(r.cliente)}</td>
       <td>${fmtDateBR(r.dataEmissao)}</td>
       <td class="val-pos">${fmtBRL(r.valor)}</td>
-      <td>${escapeHtml(r.formaPagamento||'—')}</td>
+      <td>${r.formaPagamento ? escapeHtml(r.formaPagamento) : '<span class="pill red">⚠ sem forma de pagamento</span>'}</td>
       <td>${docPagamento}</td>
       <td>${fmtDateBR(r.vencimento)}</td>
       <td>${statusPill}</td>
@@ -2569,6 +2580,9 @@ function addReceivable(){
   const cc = document.getElementById("recCC").value;
   const nota = document.getElementById("recNota").value.trim();
   if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor."); return; }
+  // Toda NF emitida precisa ter a forma de pagamento registrada — sem isso não dá pra saber
+  // como ela vai ser recebida (não pode ficar uma NF "solta" sem meio de pagamento definido).
+  if((tipo==="NF" || tipo==="NF+Boleto") && !formaPagamento){ alert("Pra NF (ou NF + Boleto), é obrigatório informar a forma de pagamento."); return; }
   const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
   if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
@@ -4089,6 +4103,9 @@ function confirmarReceberConferencia(){
   const cc = document.getElementById("recConfCC").value;
   const nota = document.getElementById("recConfNota").value.trim();
   if(!cliente || !vencimento || isNaN(valor)){ alert("Preencha ao menos cliente, vencimento e valor antes de confirmar."); return; }
+  // Toda NF emitida precisa ter a forma de pagamento registrada — sem isso não dá pra saber
+  // como ela vai ser recebida (não pode ficar uma NF "solta" sem meio de pagamento definido).
+  if((tipo==="NF" || tipo==="NF+Boleto") && !formaPagamento){ alert("Pra NF (ou NF + Boleto), é obrigatório informar a forma de pagamento."); return; }
   const dup = encontrarPossivelDuplicadoReceivable(cliente, vencimento, valor, null);
   if(dup && !confirm(`Já existe um título parecido: ${dup.cliente}, vencimento ${fmtDateBR(dup.vencimento)}, valor ${fmtBRL(dup.valor)} (status: ${dup.status}). Registrar mesmo assim?`)) return;
   state.receivables.push({
@@ -4326,6 +4343,38 @@ function renderConferenciasPendentes(){
   const nfAberta = document.getElementById("nfConferenciaCard").style.display !== "none";
   const pendentesRevisao = state.transactions.filter(t=>t.revisar);
 
+  // Não pode existir NF emitida sem forma de pagamento cadastrada — enquanto não tiver, fica
+  // aparecendo aqui como pendência de conferência até ser corrigida.
+  const nfsSemForma = state.receivables.filter(r=>
+    (r.tipo==='NF' || r.tipo==='NF+Boleto') && !r.formaPagamento
+  );
+  const nfSemFormaCard = document.getElementById("nfSemFormaCard");
+  if(nfsSemForma.length){
+    nfSemFormaCard.style.display = "block";
+    document.getElementById("tblNfSemForma").innerHTML = nfsSemForma
+      .sort((a,b)=>(b.dataEmissao||'').localeCompare(a.dataEmissao||''))
+      .map(r=>`<tr>
+        <td>${escapeHtml(r.cliente)}</td>
+        <td>${r.numero? escapeHtml(r.numero) : '—'}</td>
+        <td>${fmtDateBR(r.dataEmissao)}</td>
+        <td>${fmtDateBR(r.vencimento)}</td>
+        <td class="val-pos">${fmtBRL(r.valor)}</td>
+        <td>
+          <select id="nfSemFormaSelect-${r.id}" class="small-input">
+            <option value="">— selecione —</option>
+            <option value="Boleto">Boleto</option>
+            <option value="PIX">PIX</option>
+            <option value="TED">TED</option>
+            <option value="À vista">À vista</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </td>
+        <td><button class="btn secondary small" onclick="definirFormaPagamentoNF('${r.id}')">Salvar</button></td>
+      </tr>`).join("");
+  } else {
+    nfSemFormaCard.style.display = "none";
+  }
+
   const revisaoCard = document.getElementById("revisaoCard");
   if(pendentesRevisao.length){
     revisaoCard.style.display = "block";
@@ -4342,7 +4391,7 @@ function renderConferenciasPendentes(){
     revisaoCard.style.display = "none";
   }
 
-  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + (nfAberta?1:0) + pendentesRevisao.length;
+  const totalPendencias = (conferenciaAberta?1:0) + (estoqueAberta?1:0) + (receberAberta?1:0) + (nfAberta?1:0) + nfsSemForma.length + pendentesRevisao.length;
   const vazio = document.getElementById("conferenciasVazio");
   vazio.style.display = totalPendencias===0 ? "block" : "none";
 
@@ -4353,6 +4402,19 @@ function renderConferenciasPendentes(){
   } else {
     badge.style.display = "none";
   }
+}
+function definirFormaPagamentoNF(id){
+  const r = state.receivables.find(x=>x.id===id);
+  if(!r) return;
+  const sel = document.getElementById(`nfSemFormaSelect-${id}`);
+  const forma = sel ? sel.value : "";
+  if(!forma){ alert("Selecione a forma de pagamento antes de salvar."); return; }
+  r.formaPagamento = forma;
+  saveState();
+  toast("Forma de pagamento salva.");
+  renderConferenciasPendentes();
+  renderReceivables();
+  renderNotasFiscais();
 }
 
 /* ==================== RENDER GERAL ==================== */
