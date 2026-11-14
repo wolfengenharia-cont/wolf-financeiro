@@ -969,7 +969,7 @@ function atualizarBadgePastaAnexos(){
   if(!anexosDirHandle){
     el.innerHTML = `<button onclick="vincularPastaAnexos()">📁 Vincular pasta de anexos</button>`;
   } else if(anexosDirStatus === "ok"){
-    el.innerHTML = `📁 Anexos em: <b>${anexosDirHandle.name}</b> <button onclick="vincularPastaAnexos()">Trocar</button>`;
+    el.innerHTML = `📁 Anexos em: <b>${anexosDirHandle.name}</b> <button onclick="vincularPastaAnexos()">Trocar</button> <button onclick="migrarAnexosEmbutidosParaPasta()">⬆ Mover anexos antigos pra pasta</button>`;
   } else {
     el.innerHTML = `📁 Pasta "${anexosDirHandle.name}" <button onclick="reconectarPastaAnexos()">Confirmar acesso</button>`;
   }
@@ -1070,6 +1070,61 @@ async function construirAnexo(file, descricaoBase, dataRef){
     reader.onload = e => resolve({name:file.name, type:file.type, size:file.size, storage:"embed", dataUrl:e.target.result});
     reader.readAsDataURL(file);
   });
+}
+// Pega um anexo antigo guardado como data: URL (storage:"embed", ocupando espaço do navegador)
+// e devolve um File de verdade, pra poder regravar ele na pasta vinculada.
+async function dataUrlParaFile(dataUrl, filename, mime){
+  const resp = await fetch(dataUrl);
+  const blob = await resp.blob();
+  return new File([blob], filename || "anexo", {type: mime || blob.type || "application/octet-stream"});
+}
+// Migra pra pasta vinculada todo anexo que hoje está "embutido" (dataUrl guardado dentro do
+// localStorage do navegador) — é isso que estoura o limite de armazenamento. Varre notas/boletos
+// a receber, lançamentos e patrimônio. Não mexe em quem já está salvo na pasta.
+async function migrarAnexosEmbutidosParaPasta(){
+  if(!anexosDirHandle || anexosDirStatus !== "ok"){
+    alert("Vincule a pasta de anexos primeiro (botão no topo da tela).");
+    return;
+  }
+  if(!confirm("Isso vai mover todos os anexos (PDFs de NF, boleto, lançamentos e patrimônio) que ainda estão guardados dentro do navegador para a pasta vinculada. Pode levar um tempinho dependendo da quantidade. Continuar?")) return;
+
+  let total = 0, falhas = 0;
+  async function migrarCampo(obj, campo, descricaoBase, dataRef){
+    const anexo = obj[campo];
+    if(!anexo || anexo.storage !== "embed" || !anexo.dataUrl) return;
+    try{
+      const file = await dataUrlParaFile(anexo.dataUrl, anexo.name, anexo.type);
+      const dataPart = (dataRef || todayStr()).replace(/-/g,"");
+      const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+      const nomeSugerido = `${dataPart}_${slugify(descricaoBase)}${ext}`;
+      const nomeFinal = await salvarArquivoNaPasta(file, nomeSugerido);
+      if(nomeFinal){
+        obj[campo] = {name: anexo.name, type: anexo.type, size: anexo.size, storage:"folder", folderFileName: nomeFinal, folderName: anexosDirHandle.name};
+        total++;
+      } else {
+        falhas++;
+      }
+    }catch(e){
+      console.warn("Falha ao migrar anexo:", e);
+      falhas++;
+    }
+  }
+
+  for(const r of state.receivables){
+    await migrarCampo(r, "anexoNF", `NF ${r.numero||""} ${r.cliente||""}`, r.dataEmissao);
+    await migrarCampo(r, "anexoBoleto", `Boleto ${r.numeroBoleto||r.numero||""} ${r.cliente||""}`, r.vencimento);
+  }
+  for(const t of state.transactions){
+    await migrarCampo(t, "attachment", t.description||"lancamento", t.date);
+  }
+  for(const a of state.assets){
+    await migrarCampo(a, "attachment", a.descricao||"patrimonio", a.dataAquisicao);
+  }
+
+  saveState();
+  renderAll();
+  renderReceivables(); renderNotasFiscais(); renderPayables(); renderAssets();
+  alert(`Migração concluída: ${total} anexo(s) movido(s) para a pasta "${anexosDirHandle.name}".` + (falhas ? ` ${falhas} não deu pra mover e continuam guardados no navegador.` : ""));
 }
 // Converte um data: URL (como os que ficam guardados quando não há pasta de anexos vinculada)
 // num blob: URL. O Chrome bloqueia abrir uma aba nova navegando direto para um data: URL (fica
