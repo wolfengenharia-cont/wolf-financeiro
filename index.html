@@ -615,6 +615,7 @@
       </div>
       <div style="margin-bottom:10px;">
         <button class="btn secondary small" onclick="detectarDuplicadosReceivables()">🔍 Procurar títulos duplicados</button>
+        <button class="btn danger small" onclick="apagarTodosReceivables()">🗑 Apagar todos os boletos/NF</button>
       </div>
       <div id="duplicadosReceivablesArea"></div>
       <div style="overflow-x:auto;">
@@ -2635,6 +2636,22 @@ function deleteReceivable(id){
   state.receivables = state.receivables.filter(x=>x.id!==id);
   saveState();
   renderReceivables(); renderPainel(); renderNotasFiscais();
+}
+// Apaga de uma vez todos os boletos/NF cadastrados (pendentes, recebidos e cancelados), pra
+// recadastrar tudo do zero. Não toca nos lançamentos financeiros já lançados no extrato — só
+// some o vínculo deles com o título (o lançamento em si continua no histórico).
+function apagarTodosReceivables(){
+  const n = state.receivables.length;
+  if(!n){ alert("Não há nenhum boleto/NF cadastrado."); return; }
+  if(!confirm(`Isso vai apagar TODOS os ${n} boleto(s)/NF cadastrados (pendentes, recebidos e cancelados). Não dá pra desfazer. Tem certeza?`)) return;
+  if(!confirm("Confirma mesmo? Essa ação é definitiva.")) return;
+  state.receivables = [];
+  saveState();
+  toast("Todos os boletos/NF foram apagados.");
+  renderReceivables();
+  renderNotasFiscais();
+  renderConferenciasPendentes();
+  renderPainel();
 }
 // Agrupa os títulos por cliente (normalizado) + vencimento + valor pra achar lançamentos
 // repetidos (ex: um importado manualmente e depois de novo pelo relatório do banco).
